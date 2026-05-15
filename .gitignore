@@ -66,6 +66,7 @@ default-roles.json
 .opencode/
 opencode.json
 external-skills/
+.m2wrapper/
 
 # Test outputs
 test-results-*.csv
