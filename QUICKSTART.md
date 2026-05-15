@@ -18,7 +18,7 @@ Invoke-WebRequest http://127.0.0.1:8082/api/actuator/health
 Invoke-WebRequest http://127.0.0.1:8091/share
 
 # 5. Lancer tests complets (optionnel, 2-3 minutes)
-powershell -ExecutionPolicy Bypass -File .\check-alfresco-camunda-e2e.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\check-alfresco-camunda-e2e.ps1
 ```
 
 ---

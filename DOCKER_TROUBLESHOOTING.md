@@ -303,7 +303,7 @@ docker ps | Select-Object -Last 10
 powershell -File .\check-health.ps1
 
 # 3. Run full e2e test
-powershell -ExecutionPolicy Bypass -File .\check-alfresco-camunda-e2e.ps1 | Tee-Object -FilePath "e2e-results-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+powershell -ExecutionPolicy Bypass -File .\scripts\check-alfresco-camunda-e2e.ps1 | Tee-Object -FilePath "e2e-results-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
 
 # 4. Test manual archive
 $ticket_id = 1  # adjust to valid closed ticket

@@ -52,6 +52,7 @@ SupportFlow est une plateforme de gestion de tickets support avec :
 - `k8s/` : manifests Kubernetes
 - `argocd/` : applications ArgoCD
 - `postman/` : collections Postman
+- `scripts/` : scripts de demonstration, verification et exploitation
 - `docs/` : documentation finale du projet
 
 ## Notes
