@@ -15,14 +15,237 @@
     ]
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8082/api", "type": "string" },
-    { "key": "jwt_token", "value": "", "type": "string" },
-    { "key": "ticket_id", "value": "", "type": "string" },
-    { "key": "agent_id", "value": "2", "type": "string" },
-    { "key": "report_year", "value": "2026", "type": "string" },
-    { "key": "report_month", "value": "5", "type": "string" }
+    {
+      "key": "keycloak_url",
+      "value": "http://localhost:8180",
+      "type": "string"
+    },
+    {
+      "key": "base_url",
+      "value": "http://localhost:8082/api",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ticket_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "agent_id",
+      "value": "2",
+      "type": "string"
+    },
+    {
+      "key": "report_year",
+      "value": "2026",
+      "type": "string"
+    },
+    {
+      "key": "report_month",
+      "value": "5",
+      "type": "string"
+    }
   ],
   "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Token manager",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('jwt_token', body.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "client_id",
+                  "value": "supportflow-frontend",
+                  "type": "text"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "manager",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "manager123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/supportflow/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "supportflow",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Token agent1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('jwt_token', body.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "client_id",
+                  "value": "supportflow-frontend",
+                  "type": "text"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "agent1",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "agent123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/supportflow/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "supportflow",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Token client1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('jwt_token', body.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "client_id",
+                  "value": "supportflow-frontend",
+                  "type": "text"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "client1",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "client123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/supportflow/protocol/openid-connect/token",
+              "host": [
+                "{{keycloak_url}}"
+              ],
+              "path": [
+                "realms",
+                "supportflow",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          }
+        }
+      ]
+    },
     {
       "name": "1. Parcours ticket",
       "item": [
@@ -43,15 +266,24 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Incident de demonstration Postman\",\n  \"description\": \"Creation de ticket pour le parcours complet de soutenance.\",\n  \"type\": \"INCIDENT\",\n  \"severity\": \"HIGH\",\n  \"impact\": \"HIGH\",\n  \"clientId\": 1,\n  \"category\": \"APPLICATION\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets",
-              "host": ["{{base_url}}"],
-              "path": ["tickets"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets"
+              ]
             }
           }
         },
@@ -61,8 +293,13 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}"
+              ]
             }
           }
         },
@@ -72,9 +309,19 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/tickets/my-tickets?search=demo",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "my-tickets"],
-              "query": [{ "key": "search", "value": "demo" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "my-tickets"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "demo"
+                }
+              ]
             }
           }
         },
@@ -84,9 +331,19 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/tickets/agent-workbench?limit=8",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "agent-workbench"],
-              "query": [{ "key": "limit", "value": "8" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "agent-workbench"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "8"
+                }
+              ]
             }
           }
         }
@@ -101,8 +358,14 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/assignment-candidates",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "assignment-candidates"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "assignment-candidates"
+              ]
             }
           }
         },
@@ -110,15 +373,27 @@
           "name": "Assigner a un agent",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"source\": \"postman-demo\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/assign/{{agent_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "assign", "{{agent_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "assign",
+                "{{agent_id}}"
+              ]
             }
           }
         },
@@ -126,15 +401,26 @@
           "name": "Demander revue manager",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"Verification du plan de resolution en demonstration\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/manager-review",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "manager-review"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "manager-review"
+              ]
             }
           }
         },
@@ -142,15 +428,26 @@
           "name": "Prolonger SLA",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"minutes\": 60,\n  \"reason\": \"Extension ponctuelle pour soutenance\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/sla-extend",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "sla-extend"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "sla-extend"
+              ]
             }
           }
         }
@@ -165,8 +462,14 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/take-charge",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "take-charge"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "take-charge"
+              ]
             }
           }
         },
@@ -174,15 +477,26 @@
           "name": "Mettre en attente client",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"waitingOn\": \"CLIENT\",\n  \"pendingReason\": \"Merci de confirmer le test de reprise en heures ouvrees.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/wait-for-customer",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "wait-for-customer"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "wait-for-customer"
+              ]
             }
           }
         },
@@ -190,15 +504,26 @@
           "name": "Resoudre ticket",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"resolutionSummary\": \"Anomalie reproduite et corrigee.\",\n  \"diagnostic\": \"Le moteur SLA n integrait pas correctement la plage horaire ouvre.\",\n  \"rootCause\": \"Configuration legacy des heures ouvrees.\",\n  \"actionsTaken\": \"Recalibrage du moteur et verification sur ticket test.\",\n  \"nextRecommendation\": \"Superviser le prochain lot de tickets critiques pendant 24h.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/resolve",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "resolve"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "resolve"
+              ]
             }
           }
         }
@@ -211,15 +536,26 @@
           "name": "Ajouter un commentaire public",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"content\": \"Le test client est termine, vous pouvez reprendre le ticket.\",\n  \"internal\": false\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/comments",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "comments"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "comments"
+              ]
             }
           }
         },
@@ -227,15 +563,26 @@
           "name": "Refuser la resolution",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"Le symptome principal reste visible cote utilisateur.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/reject-resolution",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "reject-resolution"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "reject-resolution"
+              ]
             }
           }
         },
@@ -243,15 +590,26 @@
           "name": "Cloturer avec satisfaction",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"satisfactionRating\": 5,\n  \"satisfactionComment\": \"Resolution claire et conforme.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tickets/{{ticket_id}}/close",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "{{ticket_id}}", "close"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "{{ticket_id}}",
+                "close"
+              ]
             }
           }
         }
@@ -264,15 +622,25 @@
           "name": "Assist sur brouillon ticket",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Erreur de calcul SLA\",\n  \"description\": \"Le temps restant semble ignorer les heures ouvrees.\",\n  \"category\": \"SLA\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/kb/assist",
-              "host": ["{{base_url}}"],
-              "path": ["kb", "assist"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "kb",
+                "assist"
+              ]
             }
           }
         },
@@ -282,8 +650,15 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/kb/ticket/{{ticket_id}}/related",
-              "host": ["{{base_url}}"],
-              "path": ["kb", "ticket", "{{ticket_id}}", "related"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "kb",
+                "ticket",
+                "{{ticket_id}}",
+                "related"
+              ]
             }
           }
         },
@@ -291,15 +666,27 @@
           "name": "Creer un article depuis le ticket",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Resolution ticket de demonstration\",\n  \"category\": \"SLA\",\n  \"published\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/kb/ticket/{{ticket_id}}/create-from-ticket",
-              "host": ["{{base_url}}"],
-              "path": ["kb", "ticket", "{{ticket_id}}", "create-from-ticket"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "kb",
+                "ticket",
+                "{{ticket_id}}",
+                "create-from-ticket"
+              ]
             }
           }
         }
@@ -314,9 +701,20 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/tickets/archived/search?size=10",
-              "host": ["{{base_url}}"],
-              "path": ["tickets", "archived", "search"],
-              "query": [{ "key": "size", "value": "10" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets",
+                "archived",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
             }
           }
         },
@@ -326,8 +724,15 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/reports/monthly/{{report_year}}/{{report_month}}",
-              "host": ["{{base_url}}"],
-              "path": ["reports", "monthly", "{{report_year}}", "{{report_month}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reports",
+                "monthly",
+                "{{report_year}}",
+                "{{report_month}}"
+              ]
             }
           }
         },
@@ -337,9 +742,110 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/reports/monthly/{{report_year}}/{{report_month}}/download?format=pdf",
-              "host": ["{{base_url}}"],
-              "path": ["reports", "monthly", "{{report_year}}", "{{report_month}}", "download"],
-              "query": [{ "key": "format", "value": "pdf" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reports",
+                "monthly",
+                "{{report_year}}",
+                "{{report_month}}",
+                "download"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "pdf"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Supervision & notifications",
+      "item": [
+        {
+          "name": "Notifications manager",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/notifications?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tickets resolution refusee",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tickets?actionBucket=resolution-rejected&page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "actionBucket",
+                  "value": "resolution-rejected"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tickets reponse client recue",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tickets?actionBucket=customer-replied&page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "actionBucket",
+                  "value": "customer-replied"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
             }
           }
         }

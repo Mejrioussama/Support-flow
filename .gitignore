@@ -25,10 +25,10 @@ ai-agent/__pycache__/
 *.pyc
 
 # Runtime artifacts
-logs/
+logs/*
 tmp/
 tmp_decompile/
-uploads/
+uploads/*
 backups/
 c2.txt
 *.backup
@@ -73,3 +73,5 @@ test-results-*.csv
 
 # Keep generated deliverables tracked unless explicitly removed
 !docs/*.pptx
+!logs/.gitkeep
+!uploads/.gitkeep

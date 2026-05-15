@@ -17,26 +17,19 @@ Ce document complete la chaine GitOps pour une execution distante reelle avec:
 - un token SonarQube valide
 
 ## 2. Remote Git
-Le depot local n avait pas encore de `git remote`.
-Ajouter le remote reel:
+Le depot GitHub reel est maintenant :
 
 ```powershell
-git remote add origin https://github.com/<owner>/<repo>.git
+https://github.com/Mejrioussama/Support-flow.git
 ```
 
-Puis pousser la branche principale:
-
-```powershell
-git push -u origin main
-```
+Le `remote origin` doit pointer vers cette URL.
 
 ## 3. Configurer les manifests ArgoCD et GHCR
 Executer le script suivant avec les vraies valeurs:
 
 ```powershell
-.\scripts\configure-remote-gitops.ps1 `
-  -RepoUrl "https://github.com/<owner>/<repo>.git" `
-  -GitHubOwner "Mejrioussama"
+.\scripts\configure-remote-gitops.ps1
 ```
 
 Ce script met a jour:
@@ -87,4 +80,4 @@ Puis verifier:
 ## 8. Limites actuelles
 - Les secrets reels ne sont pas stockes dans ce depot.
 - Le script prepare et branche la configuration, mais la saisie des vraies valeurs doit etre faite dans GitHub et ArgoCD.
-- Sans remote GitHub reel, le pipeline distant ne peut pas etre execute depuis cette machine.
+- Sans secrets reels, le pipeline distant ne peut pas etre execute completement depuis cette machine.

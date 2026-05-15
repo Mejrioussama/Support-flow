@@ -1,9 +1,7 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$RepoUrl,
+    [string]$RepoUrl = "https://github.com/Mejrioussama/Support-flow.git",
 
-    [Parameter(Mandatory = $true)]
-    [string]$GitHubOwner
+    [string]$GitHubOwner = "Mejrioussama"
 )
 
 $ErrorActionPreference = 'Stop'

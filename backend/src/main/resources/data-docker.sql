@@ -122,7 +122,7 @@ VALUES
 INSERT INTO tickets (
   id, reference, title, description, type, status, severity, impact, priority, score,
   sla_hours, sla_deadline, sla_breached, sla_warning_sent, category, normalized_category_id,
-  client_id, created_by_user_id, assigned_agent_id,
+  client_id, created_by_user_id, assigned_agent_id, waiting_on, pending_reason, alfresco_folder_id,
   created_at, updated_at, assigned_at, resolved_at, closed_at, version
 )
 VALUES
@@ -130,84 +130,84 @@ VALUES
    'Depuis 07h15, les medecins et secretaires ne peuvent plus se connecter via SSO. Le service OAuth renvoie 502 sur la federation.',
    'INCIDENT', 'ESCALATED_SLA', 'SUPER_CRITICAL', 'CRITICAL', 'SUPER_CRITICAL', 27,
    4, DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 MINUTE), true, true, 'Authentification', 1,
-   2, 7, 3,
+   2, 7, 3, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 20 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 270 MINUTE), NULL, NULL, 0),
 
   (2, 'SF-1002', 'Dashboard ventes mobile bloque au chargement',
    'Les responsables magasin RetailNova voient un ecran vide sur iPhone quand ils ouvrent le dashboard journalier.',
    'BUG', 'IN_PROGRESS', 'HIGH', 'HIGH', 'CRITICAL', 11,
    12, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 90 MINUTE), false, true, 'Interface', 2,
-   3, 8, 4,
+   3, 8, 4, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 10 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 25 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 570 MINUTE), NULL, NULL, 0),
 
   (3, 'SF-1003', 'Preparation export comptable mensuel',
    'Le service finance demande un export CSV consolide avant la cloture de fin de mois.',
    'TASK', 'ASSIGNED', 'MEDIUM', 'MEDIUM', 'MEDIUM', 6,
    24, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 6 HOUR), false, false, 'Reporting', 3,
-   4, 9, 4,
+   4, 9, 4, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 18 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 HOUR), NULL, NULL, 0),
 
   (4, 'SF-1004', 'Lenteur severe sur replication base clients',
    'Le job de replication MySQL prend plus de 40 minutes et les rapports clients sont en decalage.',
    'INCIDENT', 'PENDING', 'CRITICAL', 'HIGH', 'CRITICAL', 13,
    8, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 45 MINUTE), false, true, 'Base de donnees', 6,
-   1, 6, 5,
+   1, 6, 5, 'CLIENT', 'En attente d accord client pour lancer le failover de replication hors heures de bureau.', NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 14 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 15 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 820 MINUTE), NULL, NULL, 0),
 
   (5, 'SF-1005', 'Demande MFA pour nouveaux cadres',
    'Financia souhaite activer MFA pour 24 nouveaux comptes direction avant lundi matin.',
    'TASK', 'OPEN', 'MEDIUM', 'LOW', 'LOW', 4,
    48, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 18 HOUR), false, false, 'Securite', 7,
-   4, 9, NULL,
+   4, 9, NULL, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 6 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 40 MINUTE), NULL, NULL, NULL, 0),
 
   (6, 'SF-1006', 'Coupures VPN intermittentes site Sousse',
    'Trois magasins remontent des deconnexions VPN de 2 a 3 minutes en pleine synchronisation stock.',
    'INCIDENT', 'ESCALATED_MANUAL', 'HIGH', 'HIGH', 'CRITICAL', 12,
    8, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 20 MINUTE), false, true, 'Reseau', 4,
-   3, 8, 5,
+   3, 8, 5, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 390 MINUTE), NULL, NULL, 0),
 
   (7, 'SF-1007', 'Question SLA sur traitement priorite haute',
    'Le client veut confirmer les delais de prise en charge le week-end pour les tickets haute priorite.',
    'QUESTION', 'RESOLVED', 'LOW', 'LOW', 'LOW', 2,
    72, DATE_ADD(DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY), INTERVAL 72 HOUR), false, false, 'General', 10,
-   1, 6, 2,
+   1, 6, 2, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 18 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 46 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 18 HOUR), NULL, 0),
 
   (8, 'SF-1008', 'Erreur SMTP sur factures sortantes',
    'Le serveur de messagerie refuse une partie des emails sortants avec un timeout TLS intermittent.',
    'INCIDENT', 'CLOSED', 'MEDIUM', 'MEDIUM', 'MEDIUM', 5,
    24, DATE_ADD(DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 3 DAY), INTERVAL 24 HOUR), false, false, 'Email', 5,
-   4, 9, 3,
+   4, 9, 3, NULL, NULL, 'seed-folder-sf-1008',
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 3 DAY), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 50 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 70 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 56 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 50 HOUR), 0),
 
   (9, 'SF-1009', 'Nouvelle demande export inventaire Excel',
    'RetailNova souhaite ajouter un export Excel avec filtre par region et famille produit.',
    'FEATURE_REQUEST', 'NEW', 'LOW', 'LOW', 'LOW', 3,
    96, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 4 DAY), false, false, 'Reporting', 3,
-   3, 8, NULL,
+   3, 8, NULL, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 3 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 3 HOUR), NULL, NULL, NULL, 0),
 
   (10, 'SF-1010', 'Suspicion acces non autorise compte VIP',
    'Le client signale une alerte inhabituelle sur un compte VIP avec tentatives multiples depuis IP etrangere.',
    'INCIDENT', 'ASSIGNED', 'CRITICAL', 'HIGH', 'CRITICAL', 15,
    6, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 2 HOUR), false, true, 'Securite', 7,
-   4, 9, 3,
+   4, 9, 3, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 20 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 70 MINUTE), NULL, NULL, 0),
 
   (11, 'SF-1011', 'Ralentissement sur generation rapport RH',
    'Le rapport RH prend plus de 9 minutes au lieu de 45 secondes en heure de pointe.',
    'BUG', 'OPEN', 'MEDIUM', 'MEDIUM', 'MEDIUM', 6,
    16, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 10 HOUR), false, false, 'Reporting', 3,
-   2, 7, NULL,
+   2, 7, NULL, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 4 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 50 MINUTE), NULL, NULL, NULL, 0),
 
   (12, 'SF-1012', 'Serveur impression etiquettes depot KO',
    'Le depot principal ne peut plus imprimer les etiquettes colis depuis 30 minutes.',
    'INCIDENT', 'IN_PROGRESS', 'HIGH', 'MEDIUM', 'HIGH', 8,
    8, DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL 3 HOUR), false, false, 'Materiel', 8,
-   3, 8, 5,
+   3, 8, 5, NULL, NULL, NULL,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 50 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 10 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 40 MINUTE), NULL, NULL, 0);
 
 -- Commentaires
@@ -240,6 +240,16 @@ VALUES
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 55 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 55 MINUTE), 0),
   (12, 'Le spooler etiquettes a ete relance. Nous suivons encore la file impression en temps reel.', false, false, 12, 5,
    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 12 MINUTE), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 12 MINUTE), 0);
+
+-- Pieces jointes
+INSERT INTO attachments (
+  id, file_name, original_name, file_path, file_size, content_type, alfresco_node_id, checksum, description,
+  ticket_id, uploaded_by_id, created_at, updated_at, version
+)
+VALUES
+  (1, 'resolution-report.pdf', 'resolution-report.pdf', 'archives/SF-1008/resolution-report.pdf', 245760,
+   'application/pdf', NULL, NULL, 'Rapport de resolution archive pour le ticket SF-1008',
+   8, 3, DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 55 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 55 HOUR), 0);
 
 -- Historique
 INSERT INTO ticket_history (

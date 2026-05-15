@@ -6,7 +6,7 @@
 # Client Creation → Manager Assignment → Agent Resolution → Archive
 #
 # Duration: ~15 minutes (with explanations)
-# Requirements: curl, jq, Backend running on localhost:8080, Keycloak on localhost:8081
+# Requirements: curl, jq, Backend running on localhost:8082, Keycloak on localhost:8180
 #
 # Usage: bash demo-full-flow.sh
 #
@@ -15,11 +15,10 @@ set -e
 trap 'echo "Demo interrupted" && exit 1' INT
 
 # Configuration
-API_BASE_URL="http://localhost:8080/api"
-KEYCLOAK_URL="http://localhost:8081"
+API_BASE_URL="http://localhost:8082/api"
+KEYCLOAK_URL="http://localhost:8180"
 REALM="supportflow"
-CLIENT_ID="supportflow-backend"
-CLIENT_SECRET="supportflow-backend-secret"
+CLIENT_ID="supportflow-frontend"
 
 # Colors for output
 RED='\033[0;31m'
@@ -60,7 +59,7 @@ get_token() {
     local token_url="$KEYCLOAK_URL/realms/$REALM/protocol/openid-connect/token"
     local response=$(curl -s -X POST "$token_url" \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "grant_type=password&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&username=$username&password=$password")
+        -d "grant_type=password&client_id=$CLIENT_ID&username=$username&password=$password")
     
     echo "$response" | jq -r '.access_token // .error'
 }

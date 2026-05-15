@@ -23,6 +23,18 @@ Invoke-WebRequest http://localhost:8180/realms/supportflow/.well-known/openid-co
 powershell -ExecutionPolicy Bypass -File .\scripts\check-alfresco-camunda-e2e.ps1
 ```
 
+## Verification soutenance recommandee
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\pre-demo-check.ps1
+```
+
+## Reseed du jeu de demo si les cas tickets ont derive
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\reset-demo-data.ps1
+```
+
 ## Services principaux
 
 - frontend : [http://localhost:4200](http://localhost:4200)
@@ -38,4 +50,3 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check-alfresco-camunda-e2e.ps
 - `manager / manager123`
 - `agent1 / agent123`
 - `client1 / client123`
-

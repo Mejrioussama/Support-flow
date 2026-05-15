@@ -6,6 +6,7 @@
 - [URLS_ACCES.md](URLS_ACCES.md)
 - [DOCKER_TROUBLESHOOTING.md](DOCKER_TROUBLESHOOTING.md)
 - [JAVA_HOME_SETUP.md](JAVA_HOME_SETUP.md)
+- [../scripts/pre-demo-check.ps1](../scripts/pre-demo-check.ps1)
 
 ## Usage applicatif
 
@@ -27,4 +28,3 @@
 - [SupportFlow-Soutenance.pptx](SupportFlow-Soutenance.pptx)
 - [rapport_supportflow_2026.tex](rapport_supportflow_2026.tex)
 - [memoire_supportflow_80p.tex](memoire_supportflow_80p.tex)
-

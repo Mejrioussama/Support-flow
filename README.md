@@ -25,6 +25,8 @@ SupportFlow est une plateforme de gestion de tickets support avec :
   - [http://localhost:8091/share](http://localhost:8091/share)
 - MailHog :
   - [http://localhost:8025](http://localhost:8025)
+- verification soutenance :
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\pre-demo-check.ps1`
 
 ## Documentation utile
 
