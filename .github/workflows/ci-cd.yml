@@ -28,6 +28,7 @@ jobs:
     outputs:
       remote_ready: ${{ steps.readiness.outputs.remote_ready }}
     steps:
+      - uses: actions/checkout@v4
       - name: Evaluate remote readiness
         id: readiness
         shell: bash
@@ -59,7 +60,7 @@ jobs:
             echo "All required remote secrets are configured." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          if grep -R "https://github.com/example/support-flow.git" argocd >/dev/null 2>&1; then
+          if [ -d argocd ] && grep -R "https://github.com/example/support-flow.git" argocd >/dev/null 2>&1; then
             remote_ready=false
             echo "ArgoCD manifests still point to the example repository." >> "$GITHUB_STEP_SUMMARY"
             echo "Run scripts/configure-remote-gitops.ps1 with the real GitHub repo URL before pushing." >> "$GITHUB_STEP_SUMMARY"
@@ -73,7 +74,7 @@ jobs:
           fi
 
           echo "remote_ready=$remote_ready" >> "$GITHUB_OUTPUT"
-          fi
+          exit 0
 
   backend-build:
     name: Build Backend
@@ -160,7 +161,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scan-ref: .
@@ -168,6 +169,7 @@ jobs:
           output: trivy-results.sarif
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
+        continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
 
