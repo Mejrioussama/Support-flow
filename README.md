@@ -28,6 +28,11 @@ SupportFlow est une plateforme de gestion de tickets support avec :
 
 ## Documentation utile
 
+- index documentation : [docs/README.md](docs/README.md)
+- demarrage rapide : [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- urls et acces : [docs/URLS_ACCES.md](docs/URLS_ACCES.md)
+- troubleshooting Docker : [docs/DOCKER_TROUBLESHOOTING.md](docs/DOCKER_TROUBLESHOOTING.md)
+- configuration Java : [docs/JAVA_HOME_SETUP.md](docs/JAVA_HOME_SETUP.md)
 - guide utilisateur : [docs/GUIDE_UTILISATEUR_SUPPORTFLOW.md](docs/GUIDE_UTILISATEUR_SUPPORTFLOW.md)
 - guide DevOps/GitOps : [docs/DEVOPS_GITOPS_SUPPORTFLOW.md](docs/DEVOPS_GITOPS_SUPPORTFLOW.md)
 - execution distante GitHub/ArgoCD : [docs/REMOTE_EXECUTION_GITHUB_ARGOCD.md](docs/REMOTE_EXECUTION_GITHUB_ARGOCD.md)
@@ -53,9 +58,9 @@ SupportFlow est une plateforme de gestion de tickets support avec :
 - `argocd/` : applications ArgoCD
 - `postman/` : collections Postman
 - `scripts/` : scripts de demonstration, verification et exploitation
-- `docs/` : documentation finale du projet
+- `docs/` : documentation finale et guides d'exploitation
 
 ## Notes
 
-- Les documents de travail intermediaires ont ete retires du repo pour garder un depot plus propre.
-- La documentation finale de reference se trouve dans `docs/`.
+- La racine du depot est volontairement minimaliste.
+- La documentation de reference se trouve dans `docs/`.
