@@ -29,6 +29,7 @@ class TicketAutomationServiceTest {
     @Mock private TicketService ticketService;
     @Mock private NotificationService notificationService;
     @Mock private EscalationService escalationService;
+    @Mock private SlaComputationService slaComputationService;
 
     @InjectMocks
     private TicketAutomationService automationService;
@@ -42,6 +43,7 @@ class TicketAutomationServiceTest {
         ReflectionTestUtils.setField(automationService, "automationIntervalMs", 15000L);
         ReflectionTestUtils.setField(automationService, "slaCriticalHours", 24L);
         ReflectionTestUtils.setField(automationService, "slaCriticalRepeatHours", 6L);
+        ReflectionTestUtils.setField(automationService, "pendingBlockedHours", 24L);
 
         testClient = new Client();
         testClient.setId(1L);
@@ -66,6 +68,9 @@ class TicketAutomationServiceTest {
         testTicket.setEscalationCount(0);
         testTicket.setSlaPaused(false);
         testTicket.setSlaWarningSent(false);
+
+        lenient().when(slaComputationService.isBreached(any(Ticket.class), any(LocalDateTime.class))).thenReturn(false);
+        lenient().when(slaComputationService.computePhase(any(Ticket.class), any(LocalDateTime.class))).thenReturn("ON_TRACK");
     }
 
     // ─────────────────────────────────────────
@@ -138,6 +143,7 @@ class TicketAutomationServiceTest {
 
             when(ticketRepository.findActiveTicketsForSlaWarning(any())).thenReturn(List.of(testTicket));
             when(historyRepository.existsByTicketIdAndAction(100L, "SLA_AT_RISK_ALERT")).thenReturn(false);
+            when(slaComputationService.computePhase(eq(testTicket), any(LocalDateTime.class))).thenReturn("AT_RISK");
 
             automationService.runAutomationCycle();
 
@@ -165,6 +171,7 @@ class TicketAutomationServiceTest {
 
             when(ticketRepository.findActiveTicketsForSlaWarning(any())).thenReturn(List.of(testTicket));
             when(historyRepository.existsByTicketIdAndAction(100L, "SLA_AT_RISK_ALERT")).thenReturn(false);
+            when(slaComputationService.computePhase(eq(testTicket), any(LocalDateTime.class))).thenReturn("AT_RISK");
 
             automationService.runAutomationCycle();
 
@@ -188,6 +195,7 @@ class TicketAutomationServiceTest {
 
             when(ticketRepository.findActiveTicketsForSlaWarning(any())).thenReturn(List.of(testTicket));
             when(historyRepository.existsByTicketIdAndAction(100L, "SLA_AT_RISK_ALERT")).thenReturn(true);
+            when(slaComputationService.computePhase(eq(testTicket), any(LocalDateTime.class))).thenReturn("AT_RISK");
 
             automationService.runAutomationCycle();
 
