@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: supportflow
+  labels:
+    app.kubernetes.io/name: supportflow
+    app.kubernetes.io/part-of: supportflow-platform

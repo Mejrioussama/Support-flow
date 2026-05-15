@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: supportflow-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/example/support-flow.git
+    targetRevision: develop
+    path: k8s/overlays/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: supportflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

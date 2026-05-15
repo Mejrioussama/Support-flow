@@ -1,0 +1,199 @@
+# ===============================================
+# SupportFlow - Configuration Application
+# ===============================================
+
+server:
+  port: 8082
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: SupportFlow
+    
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/supportflow_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: SupportFlowHikariPool
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 600000
+      connection-timeout: 10000
+      max-lifetime: 1800000
+      
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: false
+        use_sql_comments: false
+        
+  # File Upload Configuration
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+      
+  # Mail Configuration
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            
+  # OAuth2 / Keycloak Configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/supportflow}
+          jwk-set-uri: ${KEYCLOAK_JWK_URI:http://localhost:8180/realms/supportflow/protocol/openid-connect/certs}
+
+# ===============================================
+# Keycloak Admin API Configuration
+# ===============================================
+keycloak:
+  admin:
+    server-url: ${KEYCLOAK_ADMIN_URL:http://supportflow-keycloak:8080}
+    realm: ${KEYCLOAK_REALM:supportflow}
+    master-realm: master
+    client-id: admin-cli
+    username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+    password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+
+# ===============================================
+# Camunda BPM Configuration
+# ===============================================
+camunda:
+  bpm:
+    enabled: true
+    admin-user:
+      id: admin
+      password: admin
+      firstName: Admin
+      lastName: SupportFlow
+    filter:
+      create: All tasks
+    database:
+      schema-update: true
+    webapp:
+      application-path: /camunda
+      csrf:
+        enable-secure-cookie: false
+        enable-same-site-cookie: false
+        cookie-name: XSRF-TOKEN
+        entry-points: /api
+    authorization:
+      enabled: false
+
+# ===============================================
+# JWT Configuration
+# ===============================================
+jwt:
+  secret: ${JWT_SECRET:SupportFlowSecretKey2024VeryLongSecretKeyForJWTTokenGeneration}
+  expiration: 86400000  # 24 heures en millisecondes
+  refresh-expiration: 604800000  # 7 jours
+
+# ===============================================
+# Alfresco Configuration
+# ===============================================
+alfresco:
+  url: ${ALFRESCO_URL:http://localhost:8090/alfresco/api/-default-/public/cmis/versions/1.1/atom}
+  username: ${ALFRESCO_USERNAME:admin}
+  password: ${ALFRESCO_PASSWORD:admin}
+  repository:
+    root-folder: /SupportFlow/Tickets
+
+# ===============================================
+# SLA Configuration
+# ===============================================
+supportflow:
+  sla:
+    critical-hours: 4
+    high-hours: 8
+    medium-hours: 24
+    low-hours: 72
+    standard-multiplier: 1.0
+    business-multiplier: 0.75
+    premium-multiplier: 0.5
+  scoring:
+    gravity-weight: 3
+    impact-weight: 2
+    sla-weight: 1
+  business-hours:
+    start: 8
+    end: 18
+    include-saturday: false
+    include-sunday: false
+  notifications:
+    sla-warning-threshold: 0.75  # Alerte simple "ticket à risque" à 75% du SLA
+  automation:
+    interval-ms: 15000           # 15s - adaptatif pour SUPER_CRITICAL
+    sla-warning-minutes: 60
+    assigned-stuck-minutes: 30
+  escalation:
+    level1-threshold: 90         # Niveau 1: réassignation intelligente
+    level2-delay-minutes: 15     # Niveau 2: supervision manager après stagnation
+    stuck-assigned-minutes: 15   # Ticket assigné mais non pris en charge
+    level3-delay-minutes: 30     # Niveau 3: transfert manager si le blocage continue
+    cooldown-minutes: 5          # Garde-fou technique
+    max-escalations: 10          # Garde-fou technique
+  reports:
+    alfresco-root-folder: /SupportFlow/Reports
+    monthly:
+      cron: "0 0 1 1 * *"
+    
+# ===============================================
+# API Documentation
+# ===============================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+    
+# ===============================================
+# Actuator Endpoints
+# ===============================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      
+# ===============================================
+# Logging Configuration
+# ===============================================
+logging:
+  level:
+    root: INFO
+    com.supportflow: INFO
+    org.camunda: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/supportflow.log

@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_SupportFlow"
+                  targetNamespace="http://supportflow.com/bpmn"
+                  exporter="Camunda Modeler" exporterVersion="5.0.0">
+
+  <bpmn:process id="ticket-workflow" name="SupportFlow - Gestion des Tickets" isExecutable="true" camunda:historyTimeToLive="P30D">
+
+    <!-- ============================================ -->
+    <!-- START EVENT - Creation du ticket            -->
+    <!-- ============================================ -->
+    <bpmn:startEvent id="start_ticket" name="Ticket cree">
+      <bpmn:outgoing>flow_to_qualify</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- ============================================ -->
+    <!-- TASK - Qualification du ticket              -->
+    <!-- ============================================ -->
+    <bpmn:userTask id="qualify_ticket" name="Qualifier le ticket"
+                   camunda:candidateGroups="SUPPORT_MANAGER">
+      <bpmn:documentation>
+        Verifier la gravite et l'impact du ticket.
+        Assigner a un agent support.
+      </bpmn:documentation>
+      <bpmn:incoming>flow_to_qualify</bpmn:incoming>
+      <bpmn:incoming>flow_rejected</bpmn:incoming>
+      <bpmn:outgoing>flow_to_process</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- ============================================ -->
+    <!-- TASK - Traitement du ticket                 -->
+    <!-- ============================================ -->
+    <bpmn:userTask id="resolve_ticket" name="Resoudre le ticket"
+                   camunda:assignee="${assignedAgentId}">
+      <bpmn:documentation>
+        Analyser le probleme et proposer une solution.
+        Mettre a jour le ticket avec la resolution.
+      </bpmn:documentation>
+      <bpmn:incoming>flow_to_process</bpmn:incoming>
+      <bpmn:outgoing>flow_to_validation</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- ============================================ -->
+    <!-- TASK - Validation client                    -->
+    <!-- ============================================ -->
+    <bpmn:userTask id="client_validation" name="Validation client"
+                   camunda:candidateGroups="CLIENT">
+      <bpmn:documentation>
+        Le client verifie si la resolution est satisfaisante.
+        Il peut valider ou rejeter la solution proposee.
+      </bpmn:documentation>
+      <bpmn:incoming>flow_to_validation</bpmn:incoming>
+      <bpmn:outgoing>flow_to_gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- ============================================ -->
+    <!-- GATEWAY - Decision validation               -->
+    <!-- ============================================ -->
+    <bpmn:exclusiveGateway id="validation_gateway" name="Valide ?">
+      <bpmn:incoming>flow_to_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_validated</bpmn:outgoing>
+      <bpmn:outgoing>flow_rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- ============================================ -->
+    <!-- TASK - Archivage (Service Task)             -->
+    <!-- ============================================ -->
+    <bpmn:serviceTask id="archive_ticket" name="Archiver le ticket"
+                      camunda:delegateExpression="${archiveTicketDelegate}">
+      <bpmn:documentation>
+        Genere les rapports PDF/Excel.
+        Archive le ticket et ses pieces jointes dans Alfresco.
+      </bpmn:documentation>
+      <bpmn:incoming>flow_validated</bpmn:incoming>
+      <bpmn:outgoing>flow_to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- ============================================ -->
+    <!-- END EVENT - Ticket ferme                    -->
+    <!-- ============================================ -->
+    <bpmn:endEvent id="end_ticket" name="Ticket ferme">
+      <bpmn:incoming>flow_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- ============================================ -->
+    <!-- BOUNDARY EVENT - Point de controle interne  -->
+    <!-- ============================================ -->
+    <bpmn:boundaryEvent id="sla_timer_50" name="Suivi SLA interne" attachedToRef="resolve_ticket" cancelActivity="false">
+      <bpmn:outgoing>flow_sla_50</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration>${slaTimerDurationCheckpoint}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <!-- TASK - Suivi SLA interne -->
+    <bpmn:serviceTask id="sla_warning_50" name="Enregistrer le suivi SLA"
+                      camunda:expression="${slaTimerService.onSlaCheckpoint(execution)}">
+      <bpmn:incoming>flow_sla_50</bpmn:incoming>
+      <bpmn:outgoing>flow_sla_50_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- End - suivi SLA -->
+    <bpmn:endEvent id="end_sla_50" name="Suivi SLA enregistre">
+      <bpmn:incoming>flow_sla_50_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- ============================================ -->
+    <!-- BOUNDARY EVENT - Ticket a risque           -->
+    <!-- ============================================ -->
+    <bpmn:boundaryEvent id="sla_timer_80" name="Ticket a risque (75%)" attachedToRef="resolve_ticket" cancelActivity="false">
+      <bpmn:outgoing>flow_sla_80</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration>${slaTimerDurationAtRisk}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <!-- TASK - Notification ticket a risque -->
+    <bpmn:serviceTask id="sla_alert_80" name="Alerte preventive et supervision"
+                      camunda:expression="${slaTimerService.onSlaAtRisk(execution)}">
+      <bpmn:incoming>flow_sla_80</bpmn:incoming>
+      <bpmn:outgoing>flow_sla_80_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- End - ticket a risque -->
+    <bpmn:endEvent id="end_sla_80" name="Ticket a risque notifie">
+      <bpmn:incoming>flow_sla_80_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- ============================================ -->
+    <!-- BOUNDARY EVENT - SLA depasse               -->
+    <!-- ============================================ -->
+    <bpmn:boundaryEvent id="sla_timer_100" name="SLA depasse (100%)" attachedToRef="resolve_ticket" cancelActivity="false">
+      <bpmn:outgoing>flow_sla_100</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration>${slaTimerDuration100}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <!-- TASK - Evaluation escalation unifiee -->
+    <bpmn:serviceTask id="sla_escalate_100" name="Evaluation escalation unifiee"
+                      camunda:expression="${slaTimerService.onSlaBreached100Percent(execution)}">
+      <bpmn:incoming>flow_sla_100</bpmn:incoming>
+      <bpmn:outgoing>flow_sla_100_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- End - escalation evaluee -->
+    <bpmn:endEvent id="end_sla_100" name="Escalade evaluee">
+      <bpmn:incoming>flow_sla_100_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- ============================================ -->
+    <!-- SEQUENCE FLOWS                              -->
+    <!-- ============================================ -->
+    <bpmn:sequenceFlow id="flow_to_qualify" sourceRef="start_ticket" targetRef="qualify_ticket"/>
+
+    <bpmn:sequenceFlow id="flow_to_process" sourceRef="qualify_ticket" targetRef="resolve_ticket"/>
+
+    <bpmn:sequenceFlow id="flow_to_validation" sourceRef="resolve_ticket" targetRef="client_validation"/>
+
+    <bpmn:sequenceFlow id="flow_to_gateway" sourceRef="client_validation" targetRef="validation_gateway"/>
+
+    <bpmn:sequenceFlow id="flow_validated" name="Oui" sourceRef="validation_gateway" targetRef="archive_ticket">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${clientValidated == true || clientValidated == 'true'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="flow_rejected" name="Non" sourceRef="validation_gateway" targetRef="resolve_ticket">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${clientValidated == false || clientValidated == 'false' || clientValidated == null}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="flow_to_end" sourceRef="archive_ticket" targetRef="end_ticket"/>
+
+    <bpmn:sequenceFlow id="flow_sla_50" sourceRef="sla_timer_50" targetRef="sla_warning_50"/>
+    <bpmn:sequenceFlow id="flow_sla_50_end" sourceRef="sla_warning_50" targetRef="end_sla_50"/>
+
+    <bpmn:sequenceFlow id="flow_sla_80" sourceRef="sla_timer_80" targetRef="sla_alert_80"/>
+    <bpmn:sequenceFlow id="flow_sla_80_end" sourceRef="sla_alert_80" targetRef="end_sla_80"/>
+
+    <bpmn:sequenceFlow id="flow_sla_100" sourceRef="sla_timer_100" targetRef="sla_escalate_100"/>
+    <bpmn:sequenceFlow id="flow_sla_100_end" sourceRef="sla_escalate_100" targetRef="end_sla_100"/>
+
+  </bpmn:process>
+
+  <!-- ============================================ -->
+  <!-- DIAGRAM                                      -->
+  <!-- ============================================ -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="ticket-workflow">
+
+      <bpmndi:BPMNShape id="start_ticket_di" bpmnElement="start_ticket">
+        <dc:Bounds x="152" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="140" y="145" width="60" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="qualify_ticket_di" bpmnElement="qualify_ticket">
+        <dc:Bounds x="250" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="resolve_ticket_di" bpmnElement="resolve_ticket">
+        <dc:Bounds x="420" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="client_validation_di" bpmnElement="client_validation">
+        <dc:Bounds x="590" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="validation_gateway_di" bpmnElement="validation_gateway" isMarkerVisible="true">
+        <dc:Bounds x="755" y="95" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="760" y="65" width="40" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="archive_ticket_di" bpmnElement="archive_ticket">
+        <dc:Bounds x="870" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="end_ticket_di" bpmnElement="end_ticket">
+        <dc:Bounds x="1042" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1030" y="145" width="60" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="sla_timer_50_di" bpmnElement="sla_timer_50">
+        <dc:Bounds x="420" y="142" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="410" y="185" width="56" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="sla_warning_50_di" bpmnElement="sla_warning_50">
+        <dc:Bounds x="380" y="230" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="end_sla_50_di" bpmnElement="end_sla_50">
+        <dc:Bounds x="412" y="352" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="395" y="395" width="70" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="sla_timer_80_di" bpmnElement="sla_timer_80">
+        <dc:Bounds x="470" y="142" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="460" y="185" width="56" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="sla_alert_80_di" bpmnElement="sla_alert_80">
+        <dc:Bounds x="440" y="230" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="end_sla_80_di" bpmnElement="end_sla_80">
+        <dc:Bounds x="472" y="352" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="455" y="395" width="70" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="sla_timer_100_di" bpmnElement="sla_timer_100">
+        <dc:Bounds x="520" y="142" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="510" y="185" width="56" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="sla_escalate_100_di" bpmnElement="sla_escalate_100">
+        <dc:Bounds x="500" y="230" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="end_sla_100_di" bpmnElement="end_sla_100">
+        <dc:Bounds x="532" y="352" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="510" y="395" width="80" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="flow_to_qualify_di" bpmnElement="flow_to_qualify">
+        <di:waypoint x="188" y="120"/>
+        <di:waypoint x="250" y="120"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_to_process_di" bpmnElement="flow_to_process">
+        <di:waypoint x="350" y="120"/>
+        <di:waypoint x="420" y="120"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_to_validation_di" bpmnElement="flow_to_validation">
+        <di:waypoint x="520" y="120"/>
+        <di:waypoint x="590" y="120"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_to_gateway_di" bpmnElement="flow_to_gateway">
+        <di:waypoint x="690" y="120"/>
+        <di:waypoint x="755" y="120"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_validated_di" bpmnElement="flow_validated">
+        <di:waypoint x="805" y="120"/>
+        <di:waypoint x="870" y="120"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="830" y="102" width="18" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_rejected_di" bpmnElement="flow_rejected">
+        <di:waypoint x="780" y="145"/>
+        <di:waypoint x="780" y="200"/>
+        <di:waypoint x="300" y="200"/>
+        <di:waypoint x="300" y="160"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="533" y="182" width="20" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_to_end_di" bpmnElement="flow_to_end">
+        <di:waypoint x="970" y="120"/>
+        <di:waypoint x="1042" y="120"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_sla_50_di" bpmnElement="flow_sla_50">
+        <di:waypoint x="438" y="178"/>
+        <di:waypoint x="430" y="230"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_sla_50_end_di" bpmnElement="flow_sla_50_end">
+        <di:waypoint x="430" y="310"/>
+        <di:waypoint x="430" y="352"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_sla_80_di" bpmnElement="flow_sla_80">
+        <di:waypoint x="488" y="178"/>
+        <di:waypoint x="490" y="230"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_sla_80_end_di" bpmnElement="flow_sla_80_end">
+        <di:waypoint x="490" y="310"/>
+        <di:waypoint x="490" y="352"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_sla_100_di" bpmnElement="flow_sla_100">
+        <di:waypoint x="538" y="178"/>
+        <di:waypoint x="550" y="230"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_sla_100_end_di" bpmnElement="flow_sla_100_end">
+        <di:waypoint x="550" y="310"/>
+        <di:waypoint x="550" y="352"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

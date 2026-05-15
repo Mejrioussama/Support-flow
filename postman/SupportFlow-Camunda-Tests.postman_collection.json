@@ -1,0 +1,639 @@
+{
+  "info": {
+    "name": "SupportFlow - Tests Camunda",
+    "description": "Collection de tests pour valider l'intégration Camunda BPM",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8082/api",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ticket_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "process_instance_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Authentification",
+      "item": [
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Token received\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "    pm.collectionVariables.set(\"jwt_token\", jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin@supportflow.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Créer un ticket (Démarre Camunda)",
+      "item": [
+        {
+          "name": "Créer ticket HIGH priority",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Ticket created with processInstanceId\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.id).to.exist;",
+                  "    pm.expect(jsonData.reference).to.exist;",
+                  "    pm.expect(jsonData.processInstanceId).to.exist;",
+                  "    pm.expect(jsonData.status).to.eql(\"OPEN\");",
+                  "    ",
+                  "    pm.collectionVariables.set(\"ticket_id\", jsonData.id);",
+                  "    pm.collectionVariables.set(\"process_instance_id\", jsonData.processInstanceId);",
+                  "    ",
+                  "    console.log(\"Ticket ID: \" + jsonData.id);",
+                  "    console.log(\"Process Instance ID: \" + jsonData.processInstanceId);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Camunda - Erreur API Paiement\",\n  \"description\": \"Test du workflow Camunda avec escalade SLA\",\n  \"type\": \"INCIDENT\",\n  \"severity\": \"HIGH\",\n  \"impact\": \"HIGH\",\n  \"clientId\": 1,\n  \"category\": \"API\",\n  \"tags\": [\"camunda\", \"test\", \"sla\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets",
+              "host": ["{{base_url}}"],
+              "path": ["tickets"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Vérifier le ticket créé",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Ticket has Camunda data\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.processInstanceId).to.exist;",
+                  "    pm.expect(jsonData.slaHours).to.exist;",
+                  "    pm.expect(jsonData.slaDeadline).to.exist;",
+                  "    pm.expect(jsonData.score).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Assigner le ticket (Complète qualify_ticket)",
+      "item": [
+        {
+          "name": "Assigner à un agent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Ticket assigned\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"ASSIGNED\");",
+                  "    pm.expect(jsonData.assignedAgent).to.exist;",
+                  "    pm.expect(jsonData.assignedAt).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/assign/2",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "assign", "2"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Prise en charge (IN_PROGRESS)",
+      "item": [
+        {
+          "name": "Agent prend en charge",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Ticket in progress\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"IN_PROGRESS\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/take-charge",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "take-charge"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Escalade manuelle",
+      "item": [
+        {
+          "name": "Escalader vers agent senior",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Ticket escalated manually\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"ESCALATED_MANUAL\");",
+                  "    pm.expect(jsonData.assignedAgent.id).to.eql(3);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newAgentId\": 3,\n  \"motif\": \"Complexité technique - Nécessite expertise senior\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/escalate",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "escalate"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Escalade SLA automatique",
+      "item": [
+        {
+          "name": "Déclencher escalade SLA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Ticket escalated by SLA\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"ESCALATED_SLA\");",
+                  "    pm.expect(jsonData.priority).to.eql(\"CRITICAL\");",
+                  "    pm.expect(jsonData.slaWarningSent).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/escalate-sla",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "escalate-sla"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Résoudre le ticket (Complète resolve_ticket)",
+      "item": [
+        {
+          "name": "Résoudre avec résumé",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Ticket resolved\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"RESOLVED\");",
+                  "    pm.expect(jsonData.resolvedAt).to.exist;",
+                  "    pm.expect(jsonData.resolutionSummary).to.exist;",
+                  "    pm.expect(jsonData.resolutionTimeMinutes).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolutionSummary\": \"Problème résolu après redémarrage du service API et correction de la configuration OAuth. Service rétabli et testé avec succès.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/resolve",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "resolve"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Validation client (Complète client_validation)",
+      "item": [
+        {
+          "name": "Client valide et ferme",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Ticket closed\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"CLOSED\");",
+                  "    pm.expect(jsonData.closedAt).to.exist;",
+                  "    pm.expect(jsonData.satisfactionRating).to.eql(5);",
+                  "    pm.expect(jsonData.satisfactionComment).to.exist;",
+                  "});",
+                  "",
+                  "pm.test(\"Workflow completed\", function () {",
+                  "    console.log(\"âÂÂ Workflow Camunda complété avec succès!\");",
+                  "    console.log(\"Process Instance ID: \" + pm.collectionVariables.get(\"process_instance_id\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"satisfactionRating\": 5,\n  \"satisfactionComment\": \"Excellent service, problème résolu rapidement malgré l'escalade. Merci à l'équipe support!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/close",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "close"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Vérifier l'historique complet",
+      "item": [
+        {
+          "name": "Historique du ticket",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"History contains all actions\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "    pm.expect(jsonData.length).to.be.greaterThan(5);",
+                  "    ",
+                  "    var actions = jsonData.map(h => h.action);",
+                  "    pm.expect(actions).to.include(\"CREATION\");",
+                  "    pm.expect(actions).to.include(\"ASSIGNATION\");",
+                  "    pm.expect(actions).to.include(\"ESCALADE_MANUELLE\");",
+                  "    pm.expect(actions).to.include(\"ESCALADE_SLA\");",
+                  "    pm.expect(actions).to.include(\"RESOLUTION\");",
+                  "    pm.expect(actions).to.include(\"CLOTURE\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/history",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "history"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. Test workflow complet (Scénario SF-4182)",
+      "item": [
+        {
+          "name": "Créer ticket MEDIUM",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set(\"ticket_id_2\", jsonData.id);",
+                  "pm.collectionVariables.set(\"process_instance_id_2\", jsonData.processInstanceId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Synchronisation CRM interrompue\",\n  \"description\": \"Les données clients ne se synchronisent plus entre le CRM et l'ERP\",\n  \"type\": \"INCIDENT\",\n  \"severity\": \"MEDIUM\",\n  \"impact\": \"MEDIUM\",\n  \"clientId\": 2,\n  \"category\": \"CRM\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets",
+              "host": ["{{base_url}}"],
+              "path": ["tickets"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assigner",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id_2}}/assign/2",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id_2}}", "assign", "2"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Prise en charge",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id_2}}/take-charge",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id_2}}", "take-charge"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Escalade manuelle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newAgentId\": 3,\n  \"motif\": \"Complexité fonctionnelle CRM / ERP\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id_2}}/escalate",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id_2}}", "escalate"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Escalade SLA",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id_2}}/escalate-sla",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id_2}}", "escalate-sla"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Résoudre",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolutionSummary\": \"Correction du mapping CRM âÂÂ ERP. Redémarrage du job de synchronisation. Données cohérentes.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id_2}}/resolve",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id_2}}", "resolve"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clôturer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Workflow SF-4182 completed\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"CLOSED\");",
+                  "    console.log(\"âÂÂ Scénario SF-4182 complété avec succès!\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"satisfactionRating\": 5,\n  \"satisfactionComment\": \"Très bonne gestion malgré la complexité\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id_2}}/close",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id_2}}", "close"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

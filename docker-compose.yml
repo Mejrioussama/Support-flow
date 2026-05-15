@@ -1,0 +1,508 @@
+# SupportFlow - Docker Compose
+# Environnement de developpement complet
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ============================================
+  # BASE DE DONNEES MYSQL
+  # ============================================
+  mysql:
+    image: mysql:8.0
+    container_name: supportflow-mysql
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: supportflow_db
+      MYSQL_USER: ${MYSQL_USER:-supportflow}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-supportflow123}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    command: >
+      --innodb-buffer-pool-size=256M
+      --max-connections=150
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    networks:
+      - supportflow-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
+
+  # ============================================
+  # KEYCLOAK - GESTION DES IDENTITES
+  # ============================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: supportflow-keycloak
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: mysql
+      KC_DB_URL: jdbc:mysql://mysql:3306/keycloak
+      KC_DB_USERNAME: ${MYSQL_USER:-supportflow}
+      KC_DB_PASSWORD: ${MYSQL_PASSWORD:-supportflow123}
+      KC_HOSTNAME_URL: http://localhost:8180
+      KC_HOSTNAME_ADMIN_URL: http://localhost:8180
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_LOG_LEVEL: "WARN"
+      KC_CACHE: "local"
+    command: start-dev --import-realm
+    volumes:
+      - ./keycloak/supportflow-realm.json:/opt/keycloak/data/import/supportflow-realm.json
+      - ./keycloak/themes/supportflow:/opt/keycloak/themes/supportflow
+    ports:
+      - "8180:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '\"status\"' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+    networks:
+      - supportflow-network
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+        reservations:
+          memory: 384m
+
+  # ============================================
+  # BACKEND SPRING BOOT
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: supportflow-backend
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Africa/Tunis
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: supportflow_db
+      DB_USERNAME: ${MYSQL_USER:-supportflow}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-supportflow123}
+      KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/supportflow
+      KEYCLOAK_JWK_URI: http://keycloak:8080/realms/supportflow/protocol/openid-connect/certs
+      JWT_SECRET: ${JWT_SECRET:-SupportFlowSecretKey2024VeryLongSecretKeyForJWTTokenGeneration}
+      ALFRESCO_URL: http://alfresco:8080/alfresco/api/-default-/public/cmis/versions/1.1/atom
+      ALFRESCO_USERNAME: admin
+      ALFRESCO_PASSWORD: admin
+      AI_AGENT_URL: http://ai-agent:8000
+      SUPPORTFLOW_ESCALATION_LEVEL1_THRESHOLD: ${SUPPORTFLOW_ESCALATION_LEVEL1_THRESHOLD:-90}
+      SUPPORTFLOW_ESCALATION_LEVEL2_DELAY_MINUTES: ${SUPPORTFLOW_ESCALATION_LEVEL2_DELAY_MINUTES:-15}
+      SUPPORTFLOW_ESCALATION_LEVEL3_DELAY_MINUTES: ${SUPPORTFLOW_ESCALATION_LEVEL3_DELAY_MINUTES:-30}
+      SUPPORTFLOW_ESCALATION_STUCK_ASSIGNED_MINUTES: ${SUPPORTFLOW_ESCALATION_STUCK_ASSIGNED_MINUTES:-15}
+      SUPPORTFLOW_ESCALATION_COOLDOWN_MINUTES: ${SUPPORTFLOW_ESCALATION_COOLDOWN_MINUTES:-5}
+      SUPPORTFLOW_ESCALATION_MAX_ESCALATIONS: ${SUPPORTFLOW_ESCALATION_MAX_ESCALATIONS:-10}
+      JAVA_TOOL_OPTIONS: >-
+        -XX:InitialRAMPercentage=30.0
+        -XX:MaxRAMPercentage=70.0
+        -XX:+UseG1GC
+        -XX:+ExitOnOutOfMemoryError
+        -Djava.security.egd=file:/dev/./urandom
+        -Duser.timezone=Africa/Tunis
+    ports:
+      - "8082:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    networks:
+      - supportflow-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+        reservations:
+          memory: 384m
+
+  # ============================================
+  # FRONTEND ANGULAR
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: supportflow-frontend
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - supportflow-network
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+        reservations:
+          memory: 64m
+
+  # ============================================
+  # ALFRESCO (GED)
+  # ============================================
+  alfresco-postgres:
+    image: postgres:14
+    container_name: supportflow-alfresco-postgres
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: alfresco
+      POSTGRES_USER: alfresco
+      POSTGRES_PASSWORD: alfresco
+    volumes:
+      - alfresco_postgres_data:/var/lib/postgresql/data
+    networks:
+      - supportflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alfresco -d alfresco"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 128m
+
+  alfresco:
+    image: alfresco/alfresco-content-repository-community:7.4.0
+    container_name: supportflow-alfresco
+    user: "0:0"
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      JAVA_OPTS: >-
+        -Xms512m -Xmx1024m
+        -Ddb.driver=org.postgresql.Driver
+        -Ddb.username=alfresco
+        -Ddb.password=alfresco
+        -Ddb.name=alfresco
+        -Ddb.url=jdbc:postgresql://alfresco-postgres:5432/alfresco
+        -Dencryption.keystore.type=JCEKS
+        -Dencryption.keystore.create=true
+        -Dencryption.keystore.location=/usr/local/tomcat/alf_data/keystore/keystore
+        -Dencryption.keystore.keyMetaData.location=/usr/local/tomcat/alf_data/keystore/keystore-passwords.properties
+        -Dencryption.bootstrap.key=alfresco
+        -Dcsrf.filter.enabled=false
+        -Dcors.enabled=true
+        -Dcors.allowed.origins=http://localhost:8091,http://localhost:4200,http://localhost:8090
+        -Dalfresco.host=localhost
+        -Dalfresco.port=8090
+        -Dalfresco.protocol=http
+      DB_KIND: postgres
+      DB_HOST: alfresco-postgres
+      DB_PORT: 5432
+      DB_NAME: alfresco
+      DB_USERNAME: alfresco
+      DB_PASSWORD: alfresco
+    ports:
+      - "8090:8080"
+    volumes:
+      - alfresco_data:/usr/local/tomcat/alf_data
+      - ./alfresco/keystore-passwords.properties:/usr/local/tomcat/alf_data/keystore/keystore-passwords.properties:ro
+    depends_on:
+      alfresco-postgres:
+        condition: service_healthy
+    networks:
+      - supportflow-network
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+        reservations:
+          memory: 768m
+
+  # ============================================
+  # ALFRESCO SHARE (UI)
+  # ============================================
+  share:
+    image: alfresco/alfresco-share:7.4.0
+    container_name: supportflow-alfresco-share
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      REPO_HOST: alfresco
+      REPO_PORT: 8080
+      CSRF_FILTER_REFERER: "https?://localhost(:\\d+)?/.*"
+      CSRF_FILTER_ORIGIN: "https?://localhost(:\\d+)?"
+    ports:
+      - "8091:8080"
+    command: >
+      bash -c "
+        sed -i 's|Connector port=\"8080\"|Connector port=\"8080\" proxyName=\"localhost\" proxyPort=\"8091\" scheme=\"http\"|' /usr/local/tomcat/conf/server.xml &&
+        mkdir -p /usr/local/tomcat/webapps/ROOT &&
+        printf '%s' '<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"0; url=/share\"><script>window.location.replace(\"/share\");</script></head><body>Redirecting to <a href=\"/share\">/share</a>...</body></html>' > /usr/local/tomcat/webapps/ROOT/index.html &&
+        catalina.sh run
+      "
+    depends_on:
+      alfresco:
+        condition: service_started
+    networks:
+      - supportflow-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
+
+  # ============================================
+  # SONARQUBE - ANALYSE DE CODE
+  # ============================================
+  sonarqube-postgres:
+    image: postgres:15
+    container_name: supportflow-sonarqube-postgres
+    restart: unless-stopped
+    logging: *default-logging
+    profiles:
+      - tools
+    environment:
+      POSTGRES_DB: sonarqube
+      POSTGRES_USER: sonarqube
+      POSTGRES_PASSWORD: sonarqube
+    volumes:
+      - sonarqube_postgres_data:/var/lib/postgresql/data
+    networks:
+      - supportflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonarqube -d sonarqube"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: supportflow-sonarqube
+    restart: unless-stopped
+    logging: *default-logging
+    profiles:
+      - tools
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-postgres:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonarqube
+      SONAR_JDBC_PASSWORD: sonarqube
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    depends_on:
+      sonarqube-postgres:
+        condition: service_healthy
+    networks:
+      - supportflow-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # ============================================
+  # MAILHOG - SERVEUR EMAIL DE TEST
+  # ============================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: supportflow-mailhog
+    restart: unless-stopped
+    logging: *default-logging
+    profiles:
+      - tools
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - supportflow-network
+
+  # ============================================
+  # OLLAMA - Serveur LLM Local
+  # ============================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: supportflow-ollama
+    restart: unless-stopped
+    logging: *default-logging
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: "30m"
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - supportflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 20s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: supportflow-ollama-init
+    restart: "no"
+    logging: *default-logging
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+    entrypoint: ["ollama"]
+    command: ["pull", "${OLLAMA_MODEL:-qwen2.5:3b}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - supportflow-network
+
+  # ============================================
+  # AI AGENT - Python FastAPI + Ollama
+  # ============================================
+  ai-agent:
+    build:
+      context: ./ai-agent
+      dockerfile: Dockerfile
+    container_name: supportflow-ai-agent
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+      AI_TEMPERATURE: "0.3"
+      AI_MAX_TOKENS: "2048"
+      AI_NUM_CTX: "4096"
+    ports:
+      - "8000:8000"
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    networks:
+      - supportflow-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import json,sys,urllib.request; data=json.load(urllib.request.urlopen('http://localhost:8000/health')); sys.exit(0 if data.get('status')=='up' else 1)\""
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ============================================
+  # DEMO DATA LOADER - Profil optionnel
+  # ============================================
+  demo-data-loader:
+    image: mysql:8.0
+    container_name: supportflow-demo-data-loader
+    restart: "no"
+    logging: *default-logging
+    profiles:
+      - demo
+    # data-docker.sql reseeds demo data and truncates app tables on purpose.
+    # Keep this behind an explicit profile instead of running it on every start.
+    environment:
+      MYSQL_PWD: ${MYSQL_PASSWORD:-supportflow123}
+    command: >
+      sh -lc "mysql -hmysql -u${MYSQL_USER:-supportflow} supportflow_db < /seed/data-docker.sql"
+    volumes:
+      - ./backend/src/main/resources/data-docker.sql:/seed/data-docker.sql:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - supportflow-network
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  mysql_data:
+    driver: local
+  alfresco_data:
+    driver: local
+  alfresco_postgres_data:
+    driver: local
+  sonarqube_data:
+    driver: local
+  sonarqube_logs:
+    driver: local
+  sonarqube_extensions:
+    driver: local
+  sonarqube_postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+# ============================================
+# NETWORKS
+# ============================================
+networks:
+  supportflow-network:
+    driver: bridge

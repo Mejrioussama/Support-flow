@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supportflow-frontend
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/Mejrioussama/supportflow-frontend:staging

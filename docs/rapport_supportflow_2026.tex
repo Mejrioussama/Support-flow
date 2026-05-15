@@ -1,0 +1,640 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{titlesec}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  urlcolor=blue!50!black,
+  pdftitle={Rapport technique et fonctionnel de SupportFlow},
+  pdfauthor={Codex pour le projet SupportFlow}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{SupportFlow}
+\rhead{Rapport 2026}
+\cfoot{\thepage}
+
+\definecolor{sfblue}{RGB}{16,66,138}
+\definecolor{sfgray}{RGB}{80,80,80}
+
+\titleformat{\section}{\large\bfseries\color{sfblue}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{sfblue}}{\thesubsection}{0.6em}{}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible
+}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  {\scshape\LARGE Rapport de projet \par}
+  \vspace{1.5cm}
+  {\Huge\bfseries SupportFlow\par}
+  \vspace{0.6cm}
+  {\Large Systeme de gestion automatisee des tickets clients\par}
+  \vspace{1.5cm}
+  {\large Rapport technique et fonctionnel couvrant l'ensemble du projet\par}
+  \vspace{2cm}
+  \begin{tabular}{ll}
+    Nom du projet : & SupportFlow \\
+    Version observee : & 1.0.0-SNAPSHOT \\
+    Date du rapport : & 1 mai 2026 \\
+    Stack principale : & Angular 17, Spring Boot 3.2, Camunda 7, Keycloak 23 \\
+    Environnement : & Docker Compose, MySQL, Alfresco, Ollama, FastAPI \\
+  \end{tabular}
+  \vfill
+  {\large Document de synthese redige a partir de l'architecture et du code source du depot. \par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+SupportFlow est une application complete de gestion des tickets de support. Son objectif est de couvrir le cycle de vie d'un incident ou d'une demande, depuis la creation du ticket jusqu'a sa resolution, sa validation client et son archivage. Le projet ne se limite pas a un simple CRUD : il integre aussi un moteur de workflow, un systeme de roles, des notifications, des SLA, une GED et un assistant IA.
+
+Le projet a une orientation clairement metier. Il vise a reproduire le fonctionnement d'un centre de support reel avec plusieurs profils d'utilisateurs, plusieurs niveaux de supervision, des regles d'autorisation, des processus de validation et une visibilite continue sur l'etat des tickets.
+
+\subsection{Objectifs du projet}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Centraliser la gestion des tickets de support dans une interface unique.
+  \item Automatiser les transitions importantes du cycle de vie via Camunda BPM.
+  \item Controler les acces avec un RBAC clair fonde sur Keycloak et les JWT.
+  \item Suivre les delais de traitement avec des alertes SLA et des escalades.
+  \item Archiver les tickets et leurs documents dans Alfresco.
+  \item Proposer une assistance intelligente pour l'analyse et la suggestion de reponse.
+\end{itemize}
+
+\section{Vue d'ensemble du projet}
+
+Le depot contient une application full stack avec une separation nette entre le frontend, le backend metier, l'agent IA et l'infrastructure d'execution. L'application est exploitable localement via Docker Compose.
+
+\subsection{Composants principaux}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{9.7cm}}
+\toprule
+Composant & Role \\
+\midrule
+Frontend Angular & Interface utilisateur, tableau de bord, gestion des tickets, clients, utilisateurs, archives, assistant IA. \\
+Backend Spring Boot & API REST, logique metier, securite, orchestration des workflows, notifications, rapports, integration Alfresco. \\
+Camunda BPM & Pilotage du workflow du ticket, taches humaines, timers SLA et service tasks. \\
+Keycloak & Authentification, gestion des sessions et roles. \\
+MySQL & Persistance des donnees metier. \\
+Alfresco + Share & Archivage documentaire et consultation des contenus. \\
+AI Agent FastAPI + Ollama & Analyse IA locale, suggestions de reponse, diagnostic et copilot. \\
+Docker Compose & Orchestration globale des services de developpement et de demonstration. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Etat general observe}
+
+Au moment de la redaction de ce rapport, le projet presente une base solide et exploitable :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item 16 controllers backend exposes pour les differents domaines metier.
+  \item 24 services backend specialises.
+  \item 7 grands domaines fonctionnels cote frontend.
+  \item 138 fichiers cote backend dans \texttt{backend/src/main/java/com/supportflow}.
+  \item 56 fichiers cote frontend dans \texttt{frontend/src/app}.
+  \item 13 definitions de services dans \texttt{docker-compose.yml}, dont certains optionnels selon le profil choisi.
+\end{itemize}
+
+\section{Architecture technique}
+
+\subsection{Architecture logique}
+
+L'application suit une architecture en couches classique, enrichie par des composants transverses.
+
+\begin{enumerate}[leftmargin=1.2cm]
+  \item Le frontend Angular consomme l'API REST et les notifications temps reel.
+  \item Le backend Spring Boot expose les endpoints et applique les regles metier.
+  \item Les services metiers pilotent les repositories JPA, Camunda, Alfresco et l'agent IA.
+  \item Camunda orchestre les etapes humaines et automatiques du traitement d'un ticket.
+  \item Keycloak gere l'identite et les roles.
+  \item MySQL stocke les entites metier et les historiques.
+\end{enumerate}
+
+\subsection{Architecture de deploiement}
+
+\begin{lstlisting}
+Utilisateur
+   |
+   v
+Frontend Angular (port 4200)
+   |
+   +--> Backend Spring Boot (port 8082 -> 8080)
+           |
+           +--> MySQL 8.0
+           +--> Keycloak 23
+           +--> Camunda Webapp / Engine
+           +--> Alfresco / Share
+           +--> AI Agent FastAPI (port 8000)
+                    |
+                    +--> Ollama (port 11434)
+\end{lstlisting}
+
+\subsection{Services Docker definis}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{mysql}
+  \item \texttt{keycloak}
+  \item \texttt{backend}
+  \item \texttt{frontend}
+  \item \texttt{alfresco-postgres}
+  \item \texttt{alfresco}
+  \item \texttt{share}
+  \item \texttt{sonarqube} (profil \texttt{tools})
+  \item \texttt{mailhog} (profil \texttt{tools})
+  \item \texttt{ollama}
+  \item \texttt{ollama-init}
+  \item \texttt{ai-agent}
+  \item \texttt{demo-data-loader} (profil \texttt{demo})
+\end{itemize}
+
+\section{Stack technologique}
+
+\subsection{Backend}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Java 17
+  \item Spring Boot 3.2.0
+  \item Spring Web, Security, Data JPA, Validation, WebSocket, Mail, Actuator
+  \item Camunda BPM 7.20.0
+  \item Keycloak 23.0.1 et OAuth2 Resource Server
+  \item JJWT 0.12.3
+  \item MapStruct 1.5.5
+  \item Caffeine pour le cache
+  \item Apache POI pour Excel
+  \item iText pour PDF
+  \item OpenCMIS pour Alfresco
+\end{itemize}
+
+\subsection{Frontend}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Angular 17
+  \item Angular Material
+  \item RxJS 7.8
+  \item Keycloak Angular et Keycloak JS
+  \item STOMP et SockJS pour le temps reel
+  \item Chart.js et ng2-charts
+  \item Three.js dans l'interface IA
+\end{itemize}
+
+\subsection{IA}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item FastAPI
+  \item Uvicorn
+  \item Ollama
+  \item Modele local par defaut : \texttt{qwen2.5:3b}
+\end{itemize}
+
+\section{Organisation du code}
+
+\subsection{Structure globale du depot}
+
+Les dossiers principaux sont les suivants :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{backend/} : code Spring Boot.
+  \item \texttt{frontend/} : application Angular.
+  \item \texttt{ai-agent/} : agent IA Python.
+  \item \texttt{alfresco/} : configuration GED.
+  \item \texttt{keycloak/} : realm et theme Keycloak.
+  \item \texttt{docs/} : rapports, guides et documentation.
+  \item \texttt{postman/} : collections ou artefacts de tests API.
+\end{itemize}
+
+\subsection{Backend}
+
+Le backend est organise autour des packages suivants :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{controller} : couche REST.
+  \item \texttt{service} : logique metier.
+  \item \texttt{repository} : acces aux donnees.
+  \item \texttt{entity} : modele de persistance.
+  \item \texttt{dto} : contrats d'echange.
+  \item \texttt{mapper} : conversion entites/DTO.
+  \item \texttt{security} : autorisations et resolution d'identite.
+  \item \texttt{camunda} : integration au moteur BPMN.
+\end{itemize}
+
+\subsection{Frontend}
+
+Le frontend est structure en deux grands axes :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{core/} pour les services, l'authentification et les modeles.
+  \item \texttt{features/} pour les ecrans fonctionnels : dashboard, tickets, clients, utilisateurs, profil, archives et assistant IA.
+\end{itemize}
+
+\section{Description fonctionnelle}
+
+\subsection{Gestion des tickets}
+
+Le ticket est l'entite centrale du systeme. Les fonctionnalites observees dans le code couvrent :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item creation de ticket,
+  \item assignation manuelle et prise en charge,
+  \item commentaires et pieces jointes,
+  \item resolution,
+  \item validation client,
+  \item cloture et archivage,
+  \item suivi des historiques,
+  \item supervision SLA,
+  \item escalade,
+  \item recherche et filtrage.
+\end{itemize}
+
+\subsection{Gestion des clients}
+
+Le systeme permet de gerer les clients, leurs informations de contact et leurs tickets associes. Les clients interviennent egalement comme acteurs de validation dans le workflow.
+
+\subsection{Gestion des utilisateurs}
+
+Le projet gere plusieurs profils :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{ADMIN}
+  \item \texttt{SUPPORT\_MANAGER}
+  \item \texttt{SUPPORT\_AGENT}
+  \item \texttt{CLIENT}
+\end{itemize}
+
+Chaque profil dispose d'un perimetre de lecture et d'action specifique.
+
+\subsection{Tableau de bord et supervision}
+
+Le dashboard centralise les KPI, les volumes de tickets, la repartition des statuts et le suivi des performances. Il sert de poste de pilotage pour les managers et les administrateurs.
+
+\subsection{Assistant IA}
+
+L'assistant IA ne constitue pas un gadget isole. Il propose plusieurs usages metiers :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item analyse d'un ticket,
+  \item diagnostic,
+  \item suggestion de reponse,
+  \item resume d'escalade,
+  \item tendances globales,
+  \item chat contextualise avec ou sans ticket.
+\end{itemize}
+
+\section{Description technique du backend}
+
+\subsection{Controllers exposes}
+
+Les controllers identifies dans le projet montrent une couverture fonctionnelle large :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{TicketController}
+  \item \texttt{ClientController}
+  \item \texttt{UserController}
+  \item \texttt{DashboardController}
+  \item \texttt{NotificationController}
+  \item \texttt{AttachmentController}
+  \item \texttt{CommentController}
+  \item \texttt{CamundaController}
+  \item \texttt{ReportController}
+  \item \texttt{SatisfactionController}
+  \item \texttt{KnowledgeBaseController}
+  \item \texttt{AIAssistantController}
+  \item \texttt{AgentWorkloadController}
+  \item \texttt{EscalationPolicyController}
+  \item \texttt{SupportCategoryController}
+  \item \texttt{AuthController}
+\end{itemize}
+
+\subsection{Services metiers remarquables}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{TicketService} : coeur metier du cycle de vie du ticket.
+  \item \texttt{EscalationService} : logique d'escalade et de shortlist d'assignation.
+  \item \texttt{SlaTimerService} : reaction aux seuils SLA.
+  \item \texttt{NotificationService} : distribution des alertes.
+  \item \texttt{CamundaService} et \texttt{CamundaAsyncService} : orchestration BPMN et traitements asynchrones.
+  \item \texttt{CamundaBootstrapService} : rehydratation des workflows au demarrage.
+  \item \texttt{AlfrescoArchiveService} et \texttt{AlfrescoCmisService} : archivage documentaire.
+  \item \texttt{KnowledgeBaseService} : support a la capitalisation des solutions.
+  \item \texttt{ReportService} : generation de rapports PDF et Excel.
+  \item \texttt{UserIdentityService} : resolution de l'utilisateur courant.
+\end{itemize}
+
+\subsection{Points forts de la couche metier}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Separation claire entre controllers, services et repositories.
+  \item Utilisation de DTO pour maitriser les contrats d'echange.
+  \item Historisation et traçabilite des actions.
+  \item Presence de services specialises plutot qu'une logique concentree dans un seul controller.
+\end{itemize}
+
+\section{Description technique du frontend}
+
+\subsection{Modules fonctionnels}
+
+Les dossiers de fonctionnalites frontend sont :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{dashboard}
+  \item \texttt{tickets}
+  \item \texttt{clients}
+  \item \texttt{users}
+  \item \texttt{profile}
+  \item \texttt{archives-reports}
+  \item \texttt{ai-assistant}
+\end{itemize}
+
+\subsection{Services frontend}
+
+Les services principaux du frontend sont :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{auth.service.ts}
+  \item \texttt{ticket.service.ts}
+  \item \texttt{client.service.ts}
+  \item \texttt{user.service.ts}
+  \item \texttt{dashboard.service.ts}
+  \item \texttt{notification.service.ts}
+  \item \texttt{report.service.ts}
+  \item \texttt{ai.service.ts}
+  \item \texttt{websocket.service.ts}
+\end{itemize}
+
+\subsection{Role du frontend}
+
+Le frontend assure non seulement l'affichage, mais aussi :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item la projection des permissions selon le role courant,
+  \item le suivi temps reel via WebSocket,
+  \item le pilotage des actions metier sur les tickets,
+  \item les formulaires de creation, de resolution et d'assignation,
+  \item l'affichage des alertes SLA et des notifications.
+\end{itemize}
+
+\section{Workflow Camunda et cycle de vie}
+
+\subsection{Processus BPMN observe}
+
+Le fichier \texttt{ticket-workflow.bpmn} montre un processus executable de bout en bout :
+
+\begin{enumerate}[leftmargin=1.2cm]
+  \item \texttt{start\_ticket}
+  \item \texttt{qualify\_ticket}
+  \item \texttt{resolve\_ticket}
+  \item \texttt{client\_validation}
+  \item \texttt{validation\_gateway}
+  \item \texttt{archive\_ticket}
+  \item \texttt{end\_ticket}
+\end{enumerate}
+
+\subsection{Timers SLA}
+
+Le workflow contient egalement des evenements de bordure sur l'etape de resolution :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item checkpoint interne a 50\%,
+  \item ticket a risque a 75\%,
+  \item depassement a 100\%.
+\end{itemize}
+
+Ces timers permettent d'enregistrer un suivi, de notifier les responsables et d'evaluer les mecanismes d'escalade.
+
+\subsection{Valeur metier du BPMN}
+
+L'usage de Camunda apporte plusieurs avantages :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item visualisation claire du processus,
+  \item execution robuste des etapes humaines et techniques,
+  \item tracabilite des transitions,
+  \item automatisation des reactions SLA,
+  \item meilleure lisibilite pour les demonstrations et soutenances.
+\end{itemize}
+
+\section{Securite, authentification et autorisations}
+
+\subsection{Authentification}
+
+L'authentification repose sur Keycloak. Le backend est configure comme resource server OAuth2 et consomme les JWT emis par le realm SupportFlow.
+
+\subsection{Autorisation}
+
+Le projet s'appuie sur une logique de roles metiers, completee par des regles fines au niveau du ticket. Un travail important a ete effectue pour centraliser les permissions dans \texttt{AuthorizationHelper}.
+
+\subsection{Actions maintenant clairement encadrees}
+
+Les controles d'autorisation couvrent explicitement :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item l'assignation,
+  \item la prise en charge,
+  \item la resolution,
+  \item l'escalade,
+  \item les actions SLA,
+  \item la revue manager,
+  \item la cloture,
+  \item l'archivage,
+  \item le rejet de resolution.
+\end{itemize}
+
+Cette centralisation reduit les incoherences entre les boutons visibles dans l'interface et les actions reellement autorisees par le backend.
+
+\section{Notifications, historique et collaboration}
+
+Le projet contient une vraie dimension collaborative :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item commentaires sur les tickets,
+  \item pieces jointes,
+  \item historique des actions,
+  \item notifications temps reel,
+  \item supervision des alertes SLA.
+\end{itemize}
+
+La presence de WebSocket/STOMP et d'un service de notifications dedie renforce l'aspect operationnel du produit.
+
+\section{Archivage, GED et reporting}
+
+\subsection{GED}
+
+L'integration Alfresco permet de ne pas limiter le projet au simple stockage de donnees transactionnelles. Les tickets resolus peuvent etre accompagnes de documents, de pieces jointes et de rapports archives.
+
+\subsection{Rapports}
+
+Le backend reference explicitement des services de generation PDF et Excel. Cela repond a deux besoins :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item exploitation managere et export des donnees,
+  \item archivage formel des dossiers resolus.
+\end{itemize}
+
+\section{Dimension IA du projet}
+
+\subsection{Architecture IA}
+
+La brique IA est decouplee du backend principal :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item agent Python FastAPI,
+  \item appel a Ollama local,
+  \item endpoints dedies cote backend et frontend.
+\end{itemize}
+
+Ce choix d'architecture limite l'impact d'un composant IA lent ou instable sur le coeur transactionnel de l'application.
+
+\subsection{Fonctions IA actuellement visibles}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item analyse de ticket,
+  \item diagnostic,
+  \item suggestion de reponse,
+  \item resume d'escalade,
+  \item tendances globales,
+  \item recommandation d'assignation,
+  \item copilote ticket,
+  \item chat contextualise.
+\end{itemize}
+
+\subsection{Ameliorations recentes}
+
+Des corrections recentes ont renforce l'utilisabilite de cette brique :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item les outils IA sur ticket acceptent desormais un ID interne ou une reference comme \texttt{SF-1013},
+  \item l'ecran d'assignation degrade plus vite vers un fallback si l'IA est lente,
+  \item la creation de ticket ne reste plus bloquee par les traitements asynchrones lourds.
+\end{itemize}
+
+\section{Infrastructure, lancement et exploitation}
+
+\subsection{Lancement}
+
+Le projet est pense pour etre lance principalement avec Docker Compose. Cela permet de recreer un environnement coherent comprenant la base, l'authentification, le backend, le frontend, la GED et l'IA.
+
+\subsection{Avantages de cette approche}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item reproductibilite de l'environnement,
+  \item reduction des ecarts entre developpement et demonstration,
+  \item meilleure isolation des composants,
+  \item possibilite d'activer des profils optionnels comme \texttt{tools} ou \texttt{demo}.
+\end{itemize}
+
+\subsection{Observabilite}
+
+Le projet embarque aussi des elements utiles pour l'exploitation :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item healthchecks Docker,
+  \item Spring Actuator,
+  \item SonarQube en profil outil,
+  \item MailHog pour valider les emails en local,
+  \item scripts de diagnostic pour Keycloak et Camunda.
+\end{itemize}
+
+\section{Etat actuel et corrections importantes}
+
+\subsection{Corrections recentes notables}
+
+L'etat actuel du depot montre une vraie phase de consolidation fonctionnelle. Parmi les corrections marquantes :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item alignement des autorisations entre frontend et backend ;
+  \item rehydratation des workflows Camunda pour les tickets injectes par seed ;
+  \item acceleration percue de la creation des tickets par asynchronisme ;
+  \item enrichissement de la modale d'assignation pour afficher les agents eligibles et non eligibles avec leur etat ;
+  \item correction des outils IA ticket pour accepter ID et reference ;
+  \item correction du tri client pour eviter les erreurs serveur dues a un champ de tri invalide.
+\end{itemize}
+
+\subsection{Valeur de ces corrections}
+
+Ces ajustements montrent une evolution du projet vers un comportement plus professionnel :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item moins d'incoherences entre la vue utilisateur et la logique metier,
+  \item meilleure robustesse face aux donnees de demonstration,
+  \item meilleure perception de performance,
+  \item reduction des erreurs 500 visibles dans l'interface.
+\end{itemize}
+
+\section{Forces du projet}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Couverture fonctionnelle tres large pour un projet academique ou de stage.
+  \item Architecture moderne et modulaire.
+  \item Integration reelle de plusieurs briques d'entreprise : IAM, BPM, GED, IA.
+  \item Presence d'un workflow lisible et demonstrable.
+  \item Gestion fine des roles et des autorisations.
+  \item Qualite de l'environnement Docker pour les tests et la soutenance.
+  \item Documentation deja riche dans le depot.
+\end{itemize}
+
+\section{Limites et axes d'amelioration}
+
+\subsection{Points encore sensibles}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Le perimetre fonctionnel est large, donc certaines parties demandent encore une harmonisation complete.
+  \item L'IA locale peut rester lente selon la machine et le modele charge.
+  \item L'experience utilisateur peut encore etre amelioree sur quelques parcours complexes.
+  \item Une campagne de tests automatises plus large renforcerait la confiance avant mise en production reelle.
+\end{itemize}
+
+\subsection{Axes de progression recommandes}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item consolider encore la matrice RBAC et les transitions d'etat ;
+  \item enrichir la supervision manager ;
+  \item structurer davantage les motifs metiers : attente client, pause SLA, raison d'escalade ;
+  \item renforcer la base de connaissances et la capitalisation des resolutions ;
+  \item industrialiser davantage les tests de non-regression.
+\end{itemize}
+
+\section{Conclusion}
+
+SupportFlow est un projet ambitieux, bien au-dela d'une simple application CRUD. Il combine un backend riche en logique metier, un frontend moderne, un workflow Camunda, une authentification d'entreprise avec Keycloak, une GED Alfresco et une couche IA locale. Cette combinaison en fait un projet convaincant pour une soutenance ou une demonstration professionnelle.
+
+La valeur du projet ne reside pas seulement dans le nombre de fonctionnalites, mais dans leur articulation : tickets, roles, SLA, supervision, validation client, archivage et aide a la decision. Les correctifs recents montrent en plus une maturite croissante sur les sujets de permission, de performance, de robustesse et de clarte metier.
+
+En conclusion, SupportFlow constitue une base tres serieuse pour un systeme de support d'entreprise. Avec une derniere phase de stabilisation, de tests et d'enrichissement fonctionnel, il peut servir de vitrine technique solide autant que de prototype avance.
+
+\section*{Annexe : reperes utiles}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Frontend : \texttt{http://localhost:4200}
+  \item Backend : \texttt{http://localhost:8082/api}
+  \item Keycloak : \texttt{http://localhost:8180}
+  \item Camunda Cockpit : \texttt{http://localhost:8082/api/camunda/app/cockpit/default/\#/dashboard}
+  \item Alfresco Share : \texttt{http://localhost:8091/share}
+\end{itemize}
+
+\vspace{0.4cm}
+\noindent
+Fichier source du rapport : \texttt{docs/rapport\_supportflow\_2026.tex}
+
+\end{document}

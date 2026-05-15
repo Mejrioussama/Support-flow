@@ -1,0 +1,75 @@
+# ===============================================
+# SupportFlow - Configuration de TEST
+# ===============================================
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: SupportFlow-Test
+    
+  # H2 Database pour les tests
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+        
+  # Console H2
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      
+  # Désactiver OAuth2 pour les tests
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/supportflow
+
+# ===============================================
+# Camunda BPM Configuration (désactivé pour tests)
+# ===============================================
+camunda:
+  bpm:
+    enabled: false
+    
+# ===============================================
+# JWT Configuration (mode test)
+# ===============================================
+jwt:
+  secret: TestSecretKey2024VeryLongSecretKeyForJWTTokenGenerationInTestMode
+  expiration: 86400000
+
+# ===============================================
+# SLA Configuration
+# ===============================================
+supportflow:
+  sla:
+    critical-hours: 4
+    high-hours: 8
+    medium-hours: 24
+    low-hours: 72
+
+# ===============================================
+# Logging
+# ===============================================
+logging:
+  level:
+    root: INFO
+    com.supportflow: DEBUG
+    org.springframework.security: DEBUG

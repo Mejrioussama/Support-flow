@@ -1,0 +1,103 @@
+# ===============================================
+# SupportFlow - Docker Profile Configuration
+# ===============================================
+
+# Server
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:supportflow_db}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:supportflow}
+    password: ${DB_PASSWORD:supportflow123}
+
+  mail:
+    host: ${MAIL_HOST:mailhog}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+    
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: never
+      # Demo data is loaded explicitly by the optional docker compose "demo" profile.
+
+  # Security - Keycloak OAuth2
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/supportflow}
+          jwk-set-uri: ${KEYCLOAK_JWK_URI:http://keycloak:8080/realms/supportflow/protocol/openid-connect/certs}
+
+# Disable Camunda health indicator (compatibility issue)
+management:
+  health:
+    camunda:
+      enabled: false
+    mail:
+      enabled: false
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.supportflow: INFO
+    org.hibernate: WARN
+    org.springframework: INFO
+  file:
+    name: /app/logs/supportflow.log
+
+# Simplified SLA escalation for demo and jury
+supportflow:
+  frontend:
+    base-url: ${SUPPORTFLOW_FRONTEND_URL:http://localhost:4200}
+  security:
+    portal-url: ${SUPPORTFLOW_SECURITY_PORTAL_URL:http://localhost:8180/realms/supportflow/account}
+  mail:
+    from: ${SUPPORTFLOW_MAIL_FROM:no-reply@supportflow.com}
+  notifications:
+    sla-warning-threshold: 0.75
+  escalation:
+    level1-threshold: 90
+    level2-delay-minutes: 15
+    level3-delay-minutes: 30
+    stuck-assigned-minutes: 15
+    cooldown-minutes: 5
+    max-escalations: 10
+
+# Camunda
+camunda:
+  bpm:
+    enabled: true
+    admin-user:
+      id: admin
+      password: ${CAMUNDA_ADMIN_PASSWORD:admin}
+    database:
+      schema-update: true
+    webapp:
+      application-path: /camunda
+      csrf:
+        enable-secure-cookie: false
+        enable-same-site-cookie: false
+        cookie-name: XSRF-TOKEN
+        entry-points: /api
+    authorization:
+      enabled: false

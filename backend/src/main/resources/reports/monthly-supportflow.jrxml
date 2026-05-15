@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="monthly-supportflow"
+              pageWidth="595"
+              pageHeight="842"
+              columnWidth="515"
+              leftMargin="40"
+              rightMargin="40"
+              topMargin="32"
+              bottomMargin="32"
+              uuid="f6a78523-3760-42fe-bbde-9d9d175bc279">
+    <parameter name="periodLabel" class="java.lang.String"/>
+    <parameter name="generatedAt" class="java.lang.String"/>
+    <parameter name="ticketsCreated" class="java.lang.String"/>
+    <parameter name="ticketsCompleted" class="java.lang.String"/>
+    <parameter name="averageResolutionTime" class="java.lang.String"/>
+    <parameter name="slaComplianceRate" class="java.lang.String"/>
+    <field name="type" class="java.lang.String"/>
+    <field name="count" class="java.lang.String"/>
+
+    <title>
+        <band height="210">
+            <staticText>
+                <reportElement x="0" y="0" width="320" height="28" forecolor="#0F172A" uuid="01f85ac0-9993-41e2-bb85-1cb5de5c7d56"/>
+                <textElement>
+                    <font size="22" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Rapport mensuel SupportFlow]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="0" y="34" width="320" height="18" forecolor="#475569" uuid="5922446d-86c3-49b1-907b-e563d9a1abf4"/>
+                <textElement><font size="11"/></textElement>
+                <textFieldExpression><![CDATA["Periode : " + $P{periodLabel}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="0" y="54" width="320" height="18" forecolor="#64748B" uuid="fda9c57d-56fa-4303-8642-e7038f8efb90"/>
+                <textElement><font size="10"/></textElement>
+                <textFieldExpression><![CDATA["Genere le " + $P{generatedAt}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="88" width="140" height="16" forecolor="#2563EB" uuid="25647166-d456-4d0d-950b-db519f503f0d"/>
+                <textElement><font size="10" isBold="true"/></textElement>
+                <text><![CDATA[INDICATEURS CLES]]></text>
+            </staticText>
+
+            <rectangle>
+                <reportElement x="0" y="114" width="247" height="38" backcolor="#EFF6FF" uuid="47d60ded-f2d1-46ae-895c-7ef1b6b73bf8"/>
+            </rectangle>
+            <rectangle>
+                <reportElement x="268" y="114" width="247" height="38" backcolor="#ECFDF5" uuid="b59390bd-a022-4e7f-b1e8-30128f6f29f6"/>
+            </rectangle>
+            <rectangle>
+                <reportElement x="0" y="162" width="247" height="38" backcolor="#FFF7ED" uuid="9282f938-567d-49d7-96a7-2c46c51883fd"/>
+            </rectangle>
+            <rectangle>
+                <reportElement x="268" y="162" width="247" height="38" backcolor="#FDF2F8" uuid="1137ce4c-7df0-4ce6-9ae0-52295cda3ad0"/>
+            </rectangle>
+
+            <textField>
+                <reportElement x="12" y="124" width="220" height="16" forecolor="#0F172A" uuid="2c75ce32-6d06-4fe0-9f1b-05f287b1747a"/>
+                <textElement><font size="10" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA["Tickets crees : " + $P{ticketsCreated}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="280" y="124" width="220" height="16" forecolor="#14532D" uuid="fe5ed485-8eed-4103-94ae-c5f0456a255d"/>
+                <textElement><font size="10" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA["Tickets resolus / fermes : " + $P{ticketsCompleted}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="12" y="172" width="220" height="16" forecolor="#9A3412" uuid="70d5c3c8-6bb4-435d-8cb2-1bb5e1c989b7"/>
+                <textElement><font size="10" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA["Temps moyen : " + $P{averageResolutionTime}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="280" y="172" width="220" height="16" forecolor="#9D174D" uuid="92758941-edf5-46a0-b9b4-72ce2bd8da55"/>
+                <textElement><font size="10" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA["Respect SLA : " + $P{slaComplianceRate}]]></textFieldExpression>
+            </textField>
+        </band>
+    </title>
+
+    <columnHeader>
+        <band height="34">
+            <staticText>
+                <reportElement x="0" y="0" width="220" height="14" forecolor="#2563EB" uuid="c91a2d59-99e1-421f-9384-c3d73d96afd7"/>
+                <textElement><font size="10" isBold="true"/></textElement>
+                <text><![CDATA[TOP TYPES D'INCIDENTS]]></text>
+            </staticText>
+            <line>
+                <reportElement x="0" y="20" width="515" height="1" forecolor="#CBD5E1" uuid="1642a76d-e150-466a-87cf-258e6c6c2e57"/>
+            </line>
+            <staticText>
+                <reportElement x="8" y="22" width="320" height="12" forecolor="#475569" uuid="3ece48c9-6690-47eb-b1cb-492c810a2ab4"/>
+                <textElement><font size="9" isBold="true"/></textElement>
+                <text><![CDATA[Type]]></text>
+            </staticText>
+            <staticText>
+                <reportElement x="420" y="22" width="80" height="12" forecolor="#475569" uuid="dd52db39-6a3c-48b9-b0c2-c6c370962fcf"/>
+                <textElement textAlignment="Right"><font size="9" isBold="true"/></textElement>
+                <text><![CDATA[Volume]]></text>
+            </staticText>
+        </band>
+    </columnHeader>
+
+    <detail>
+        <band height="24">
+            <line>
+                <reportElement x="0" y="23" width="515" height="1" forecolor="#E2E8F0" uuid="38f6fd3a-0a4b-4780-85d5-7f11134870d4"/>
+            </line>
+            <textField>
+                <reportElement x="8" y="4" width="340" height="14" forecolor="#0F172A" uuid="cb09998d-e5af-403e-b661-6b40bbe899f1"/>
+                <textElement><font size="10"/></textElement>
+                <textFieldExpression><![CDATA[$F{type}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="420" y="4" width="80" height="14" forecolor="#0F172A" uuid="efcf1eb4-b23f-447e-a2da-df43b83a9ea2"/>
+                <textElement textAlignment="Right"><font size="10" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$F{count}]]></textFieldExpression>
+            </textField>
+        </band>
+    </detail>
+
+    <pageFooter>
+        <band height="18">
+            <textField>
+                <reportElement x="430" y="2" width="70" height="12" forecolor="#94A3B8" uuid="7d2360ff-e938-4ad5-90f0-1db8b3b58f31"/>
+                <textElement textAlignment="Right"><font size="8"/></textElement>
+                <textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER}]]></textFieldExpression>
+            </textField>
+        </band>
+    </pageFooter>
+</jasperReport>

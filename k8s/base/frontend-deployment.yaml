@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supportflow-frontend
+  namespace: supportflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supportflow-frontend
+  template:
+    metadata:
+      labels:
+        app: supportflow-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/Mejrioussama/supportflow-frontend:staging
+          ports:
+            - containerPort: 80

@@ -1,0 +1,74 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Node / Angular
+frontend/node_modules/
+frontend/dist/
+node_modules/
+dist/
+.angular/
+
+# Java / Maven
+backend/target/
+*.class
+.mvn/wrapper/maven-wrapper.jar
+
+# Python / AI agent
+ai-agent/.venv/
+ai-agent/venv/
+ai-agent/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Runtime artifacts
+logs/
+tmp/
+tmp_decompile/
+uploads/
+backups/
+c2.txt
+*.backup
+*.log
+*-headers.txt
+headers.txt
+login-headers.txt
+tasklist-headers.txt
+welcome2-headers.txt
+
+# Environment / secrets
+.env
+.env.local
+*.secret
+token.txt
+admin-token.txt
+manager-token.txt
+token-decoded.json
+token-payload.json
+decoded2.json
+decoded3.json
+decoded4.json
+cookies.txt
+curl_debug.txt
+hal_test.json
+clients.json
+clients.txt
+users.json
+roles.json
+account-roles.json
+user-roles.json
+default-roles.json
+
+# Local tooling
+.opencode/
+opencode.json
+external-skills/
+
+# Test outputs
+test-results-*.csv
+
+# Keep generated deliverables tracked unless explicitly removed
+!docs/*.pptx

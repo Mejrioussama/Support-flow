@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supportflow-backend
+  namespace: supportflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supportflow-backend
+  template:
+    metadata:
+      labels:
+        app: supportflow-backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/Mejrioussama/supportflow-backend:staging
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: supportflow-config
+            - secretRef:
+                name: supportflow-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30

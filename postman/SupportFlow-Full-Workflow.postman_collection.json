@@ -1,0 +1,349 @@
+{
+  "info": {
+    "name": "SupportFlow - Full Workflow",
+    "description": "Collection de demonstration complete pour les parcours client, agent, manager, KB, GED et reporting.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8082/api", "type": "string" },
+    { "key": "jwt_token", "value": "", "type": "string" },
+    { "key": "ticket_id", "value": "", "type": "string" },
+    { "key": "agent_id", "value": "2", "type": "string" },
+    { "key": "report_year", "value": "2026", "type": "string" },
+    { "key": "report_month", "value": "5", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Parcours ticket",
+      "item": [
+        {
+          "name": "Creer un ticket",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('ticket_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Incident de demonstration Postman\",\n  \"description\": \"Creation de ticket pour le parcours complet de soutenance.\",\n  \"type\": \"INCIDENT\",\n  \"severity\": \"HIGH\",\n  \"impact\": \"HIGH\",\n  \"clientId\": 1,\n  \"category\": \"APPLICATION\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets",
+              "host": ["{{base_url}}"],
+              "path": ["tickets"]
+            }
+          }
+        },
+        {
+          "name": "Lire le ticket",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Mes tickets",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tickets/my-tickets?search=demo",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "my-tickets"],
+              "query": [{ "key": "search", "value": "demo" }]
+            }
+          }
+        },
+        {
+          "name": "Agent workbench",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tickets/agent-workbench?limit=8",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "agent-workbench"],
+              "query": [{ "key": "limit", "value": "8" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Workflow manager",
+      "item": [
+        {
+          "name": "Candidats d assignation",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/assignment-candidates",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "assignment-candidates"]
+            }
+          }
+        },
+        {
+          "name": "Assigner a un agent",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"postman-demo\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/assign/{{agent_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "assign", "{{agent_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Demander revue manager",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Verification du plan de resolution en demonstration\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/manager-review",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "manager-review"]
+            }
+          }
+        },
+        {
+          "name": "Prolonger SLA",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"minutes\": 60,\n  \"reason\": \"Extension ponctuelle pour soutenance\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/sla-extend",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "sla-extend"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Workflow agent",
+      "item": [
+        {
+          "name": "Prendre en charge",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/take-charge",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "take-charge"]
+            }
+          }
+        },
+        {
+          "name": "Mettre en attente client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"waitingOn\": \"CLIENT\",\n  \"pendingReason\": \"Merci de confirmer le test de reprise en heures ouvrees.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/wait-for-customer",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "wait-for-customer"]
+            }
+          }
+        },
+        {
+          "name": "Resoudre ticket",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolutionSummary\": \"Anomalie reproduite et corrigee.\",\n  \"diagnostic\": \"Le moteur SLA n integrait pas correctement la plage horaire ouvre.\",\n  \"rootCause\": \"Configuration legacy des heures ouvrees.\",\n  \"actionsTaken\": \"Recalibrage du moteur et verification sur ticket test.\",\n  \"nextRecommendation\": \"Superviser le prochain lot de tickets critiques pendant 24h.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/resolve",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "resolve"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Workflow client",
+      "item": [
+        {
+          "name": "Ajouter un commentaire public",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Le test client est termine, vous pouvez reprendre le ticket.\",\n  \"internal\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/comments",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "comments"]
+            }
+          }
+        },
+        {
+          "name": "Refuser la resolution",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Le symptome principal reste visible cote utilisateur.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/reject-resolution",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "reject-resolution"]
+            }
+          }
+        },
+        {
+          "name": "Cloturer avec satisfaction",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"satisfactionRating\": 5,\n  \"satisfactionComment\": \"Resolution claire et conforme.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/close",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "close"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Knowledge Base",
+      "item": [
+        {
+          "name": "Assist sur brouillon ticket",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Erreur de calcul SLA\",\n  \"description\": \"Le temps restant semble ignorer les heures ouvrees.\",\n  \"category\": \"SLA\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/kb/assist",
+              "host": ["{{base_url}}"],
+              "path": ["kb", "assist"]
+            }
+          }
+        },
+        {
+          "name": "Articles lies au ticket",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/kb/ticket/{{ticket_id}}/related",
+              "host": ["{{base_url}}"],
+              "path": ["kb", "ticket", "{{ticket_id}}", "related"]
+            }
+          }
+        },
+        {
+          "name": "Creer un article depuis le ticket",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Resolution ticket de demonstration\",\n  \"category\": \"SLA\",\n  \"published\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/kb/ticket/{{ticket_id}}/create-from-ticket",
+              "host": ["{{base_url}}"],
+              "path": ["kb", "ticket", "{{ticket_id}}", "create-from-ticket"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Archives & reporting",
+      "item": [
+        {
+          "name": "Rechercher archives",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tickets/archived/search?size=10",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "archived", "search"],
+              "query": [{ "key": "size", "value": "10" }]
+            }
+          }
+        },
+        {
+          "name": "Generer rapport mensuel",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/reports/monthly/{{report_year}}/{{report_month}}",
+              "host": ["{{base_url}}"],
+              "path": ["reports", "monthly", "{{report_year}}", "{{report_month}}"]
+            }
+          }
+        },
+        {
+          "name": "Telecharger rapport PDF",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/reports/monthly/{{report_year}}/{{report_month}}/download?format=pdf",
+              "host": ["{{base_url}}"],
+              "path": ["reports", "monthly", "{{report_year}}", "{{report_month}}", "download"],
+              "query": [{ "key": "format", "value": "pdf" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

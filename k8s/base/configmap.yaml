@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supportflow-config
+  namespace: supportflow
+data:
+  SPRING_PROFILES_ACTIVE: k8s
+  DB_HOST: supportflow-mysql
+  DB_PORT: "3306"
+  DB_NAME: supportflow_db
+  KEYCLOAK_ISSUER_URI: http://supportflow-keycloak:8080/realms/supportflow
+  KEYCLOAK_JWK_URI: http://supportflow-keycloak:8080/realms/supportflow/protocol/openid-connect/certs
+  ALFRESCO_URL: http://supportflow-alfresco:8080/alfresco/api/-default-/public/cmis/versions/1.1/atom
+  AI_AGENT_URL: http://supportflow-ai-agent:8000
+  TZ: Africa/Tunis

@@ -1,0 +1,318 @@
+{
+  "realm": "supportflow",
+  "enabled": true,
+  "displayName": "SupportFlow",
+  "displayNameHtml": "<strong>SupportFlow</strong>",
+  "loginTheme": "supportflow",
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMIN",
+        "description": "Administrateur système"
+      },
+      {
+        "name": "SUPPORT_MANAGER",
+        "description": "Responsable support"
+      },
+      {
+        "name": "SUPPORT_AGENT",
+        "description": "Agent support"
+      },
+      {
+        "name": "CLIENT",
+        "description": "Client"
+      }
+    ],
+    "client": {
+      "supportflow-backend": [
+        {
+          "name": "admin",
+          "description": "Admin role for backend"
+        },
+        {
+          "name": "user",
+          "description": "User role for backend"
+        }
+      ]
+    }
+  },
+  "groups": [
+    {
+      "name": "Administrateurs",
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "name": "Managers",
+      "realmRoles": ["SUPPORT_MANAGER"]
+    },
+    {
+      "name": "Agents",
+      "realmRoles": ["SUPPORT_AGENT"]
+    },
+    {
+      "name": "Clients",
+      "realmRoles": ["CLIENT"]
+    }
+  ],
+  "defaultRoles": ["CLIENT"],
+  "clients": [
+    {
+      "clientId": "supportflow-backend",
+      "name": "SupportFlow Backend API",
+      "description": "Backend REST API",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "supportflow-backend-secret",
+      "bearerOnly": true,
+      "consentRequired": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "86400"
+      },
+      "fullScopeAllowed": true,
+      "defaultClientScopes": ["openid", "profile", "email", "roles"],
+      "optionalClientScopes": ["offline_access"]
+    },
+    {
+      "clientId": "supportflow-frontend",
+      "name": "SupportFlow Frontend",
+      "description": "Angular Frontend Application",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:4200/*",
+        "http://localhost:8080/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "http://localhost:8080",
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "access.token.lifespan": "86400"
+      },
+      "fullScopeAllowed": true,
+      "defaultClientScopes": ["openid", "profile", "email", "roles"],
+      "optionalClientScopes": ["offline_access"],
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "System",
+      "email": "admin@supportflow.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["ADMIN"],
+      "clientRoles": {
+        "supportflow-backend": ["admin"]
+      }
+    },
+    {
+      "username": "manager",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Pierre",
+      "lastName": "Manager",
+      "email": "manager@supportflow.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "manager123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["SUPPORT_MANAGER"]
+    },
+    {
+      "username": "agent1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Karim",
+      "lastName": "Agent",
+      "email": "karim@supportflow.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "agent123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["SUPPORT_AGENT"]
+    },
+    {
+      "username": "client1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Jean",
+      "lastName": "Client",
+      "email": "client@abc.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["CLIENT"]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "roles",
+      "description": "OpenID Connect scope for add user roles to the access token",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "${rolesScopeConsentText}"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "foo",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true"
+          }
+        },
+        {
+          "name": "client roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "foo",
+            "access.token.claim": "true",
+            "claim.name": "resource_access.${client_id}.roles",
+            "jsonType.label": "String",
+            "multivalued": "true"
+          }
+        },
+        {
+          "name": "audience resolve",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-resolve-mapper",
+          "consentRequired": false,
+          "config": {}
+        }
+      ]
+    },
+    {
+      "name": "supportflow-scope",
+      "description": "SupportFlow custom scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "realm_roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicyReportOnly": "",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
+  "smtpServer": {
+    "host": "mailhog",
+    "port": "1025",
+    "from": "no-reply@supportflow.com",
+    "fromDisplayName": "SupportFlow",
+    "ssl": "false",
+    "starttls": "false",
+    "auth": "false"
+  },
+  "eventsEnabled": true,
+  "eventsListeners": ["jboss-logging"],
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "REGISTER",
+    "REGISTER_ERROR"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true
+}

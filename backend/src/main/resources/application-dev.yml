@@ -1,0 +1,88 @@
+# ===============================================
+# SupportFlow - Configuration DEV (sans dépendances externes)
+# ===============================================
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: SupportFlow-Dev
+    
+  # H2 Database (en mémoire)
+  datasource:
+    url: jdbc:h2:mem:supportflow_dev;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: false
+    defer-datasource-initialization: true
+        
+  # Console H2 (accessible sur /api/h2-console)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+        
+  # Initialisation des données
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data-dev.sql
+
+# ===============================================
+# Camunda BPM (désactivé en dev)
+# ===============================================
+camunda:
+  bpm:
+    enabled: false
+    
+# ===============================================
+# JWT Configuration
+# ===============================================
+jwt:
+  secret: DevSecretKey2024VeryLongSecretKeyForJWTTokenGenerationInDevMode1234567890
+  expiration: 86400000
+
+# ===============================================
+# SLA Configuration
+# ===============================================
+supportflow:
+  sla:
+    critical-hours: 4
+    high-hours: 8
+    medium-hours: 24
+    low-hours: 72
+
+# ===============================================
+# API Documentation
+# ===============================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    
+# ===============================================
+# Logging
+# ===============================================
+logging:
+  level:
+    root: INFO
+    com.supportflow: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
