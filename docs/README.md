@@ -21,6 +21,7 @@
 - [REMOTE_EXECUTION_GITHUB_ARGOCD.md](REMOTE_EXECUTION_GITHUB_ARGOCD.md)
 - [SONARQUBE_QUALITE_SUPPORTFLOW.md](SONARQUBE_QUALITE_SUPPORTFLOW.md)
 - [PWA_VALIDATION_SUPPORTFLOW.md](PWA_VALIDATION_SUPPORTFLOW.md)
+- [../scripts/validate-remote-gitops.ps1](../scripts/validate-remote-gitops.ps1)
 
 ## Soutenance et livrables
 

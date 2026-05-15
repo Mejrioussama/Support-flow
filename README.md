@@ -38,6 +38,7 @@ SupportFlow est une plateforme de gestion de tickets support avec :
 - guide utilisateur : [docs/GUIDE_UTILISATEUR_SUPPORTFLOW.md](docs/GUIDE_UTILISATEUR_SUPPORTFLOW.md)
 - guide DevOps/GitOps : [docs/DEVOPS_GITOPS_SUPPORTFLOW.md](docs/DEVOPS_GITOPS_SUPPORTFLOW.md)
 - execution distante GitHub/ArgoCD : [docs/REMOTE_EXECUTION_GITHUB_ARGOCD.md](docs/REMOTE_EXECUTION_GITHUB_ARGOCD.md)
+- validation GitOps distante : `powershell -ExecutionPolicy Bypass -File .\scripts\validate-remote-gitops.ps1`
 - validation PWA : [docs/PWA_VALIDATION_SUPPORTFLOW.md](docs/PWA_VALIDATION_SUPPORTFLOW.md)
 - qualite SonarQube : [docs/SONARQUBE_QUALITE_SUPPORTFLOW.md](docs/SONARQUBE_QUALITE_SUPPORTFLOW.md)
 - support soutenance : [docs/SOUTENANCE_SUPPORTFLOW.md](docs/SOUTENANCE_SUPPORTFLOW.md)
