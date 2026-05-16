@@ -2,6 +2,9 @@
 # SupportFlow - Kubernetes Profile Configuration
 # ===============================================
 
+server:
+  port: 8080
+
 management:
   health:
     camunda:
