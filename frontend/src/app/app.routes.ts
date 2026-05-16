@@ -1,18 +1,10 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
-import { Component } from '@angular/core';
-
-@Component({
-  selector: 'app-blank',
-  standalone: true,
-  template: ''
-})
-export class BlankComponent {}
 
 export const routes: Routes = [
   {
     path: '',
-    component: BlankComponent,
+    redirectTo: 'dashboard',
     pathMatch: 'full'
   },
   {
