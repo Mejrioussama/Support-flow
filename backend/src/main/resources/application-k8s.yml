@@ -1,0 +1,13 @@
+# ===============================================
+# SupportFlow - Kubernetes Profile Configuration
+# ===============================================
+
+management:
+  health:
+    camunda:
+      enabled: false
+    mail:
+      enabled: false
+  endpoint:
+    health:
+      show-details: always

@@ -8,4 +8,5 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ghcr.io/mejrioussama/supportflow-backend:staging
+          image: supportflow-backend-local:gitops
+          imagePullPolicy: Never
