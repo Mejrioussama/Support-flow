@@ -8,5 +8,5 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: support-flow-frontend:latest
+          image: supportflow-frontend-local:gitops
           imagePullPolicy: Never
