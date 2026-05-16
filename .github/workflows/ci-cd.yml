@@ -23,7 +23,7 @@ env:
 
 jobs:
   remote-readiness:
-    name: Remote GitOps Readiness
+    name: GitOps Repo Readiness
     runs-on: ubuntu-latest
     outputs:
       remote_ready: ${{ steps.readiness.outputs.remote_ready }}
@@ -41,22 +41,8 @@ jobs:
             exit 0
           fi
 
-          missing=()
-          [[ -n "${{ secrets.ARGOCD_SERVER }}" ]] || missing+=("ARGOCD_SERVER")
-          [[ -n "${{ secrets.ARGOCD_AUTH_TOKEN }}" ]] || missing+=("ARGOCD_AUTH_TOKEN")
-
-          if [ ${#missing[@]} -gt 0 ]; then
-            remote_ready=false
-            echo "Remote GitOps readiness is incomplete." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Missing secrets:" >> "$GITHUB_STEP_SUMMARY"
-            for item in "${missing[@]}"; do
-              echo "- $item" >> "$GITHUB_STEP_SUMMARY"
-            done
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "All required remote secrets are configured." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          echo "ArgoCD token-based sync is not required: applications use automated sync from Git." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
           if [ -d argocd ] && grep -R "https://github.com/example/support-flow.git" argocd >/dev/null 2>&1; then
             remote_ready=false
@@ -68,7 +54,7 @@ jobs:
           if [ "$remote_ready" = true ]; then
             echo "Remote deployment stage is ready to run." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Remote deployment jobs will be skipped until readiness is complete." >> "$GITHUB_STEP_SUMMARY"
+            echo "GitOps deployment jobs will be skipped until repository readiness is complete." >> "$GITHUB_STEP_SUMMARY"
           fi
 
           echo "remote_ready=$remote_ready" >> "$GITHUB_OUTPUT"
@@ -259,17 +245,12 @@ jobs:
           git push
 
   argocd-sync:
-    name: Sync ArgoCD
+    name: ArgoCD Auto-Sync
     runs-on: ubuntu-latest
     needs: [update-gitops-manifests, remote-readiness]
     if: github.event_name != 'pull_request' && needs.update-gitops-manifests.result == 'success' && needs.remote-readiness.outputs.remote_ready == 'true'
     steps:
-      - name: Trigger ArgoCD sync
-        env:
-          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
-          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+      - name: Confirm ArgoCD auto-sync mode
         run: |
-          curl -sS -X POST "${ARGOCD_SERVER}/api/v1/applications/supportflow-${{ env.K8S_ENV }}/sync" \
-            -H "Authorization: Bearer ${ARGOCD_AUTH_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"prune": true, "dryRun": false, "strategy": {"hook": {"force": true}}}'
+          echo "ArgoCD applications are configured with syncPolicy.automated." >> "$GITHUB_STEP_SUMMARY"
+          echo "Once manifests are pushed, ArgoCD reconciles them automatically." >> "$GITHUB_STEP_SUMMARY"

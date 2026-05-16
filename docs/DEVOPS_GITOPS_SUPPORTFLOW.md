@@ -20,12 +20,11 @@ Le workflow `.github/workflows/ci-cd.yml` execute:
 4. scan securite Trivy
 5. build/push des images vers GHCR
 6. mise a jour des overlays `k8s/overlays/<env>/`
-7. synchronisation ArgoCD
+7. auto-sync ArgoCD via `syncPolicy.automated`
 
 ## 4. Secrets attendus
 ### Secrets GitHub Actions
-- `ARGOCD_SERVER`
-- `ARGOCD_AUTH_TOKEN`
+- aucun secret ArgoCD requis en mode auto-sync
 
 ### Secrets cluster / runtime
 - `supportflow-secrets`
@@ -40,7 +39,7 @@ Le workflow `.github/workflows/ci-cd.yml` execute:
 - un push sur `develop` build les deux applications
 - les images GHCR sont poussees
 - les manifests `backend-patch.yaml` et `frontend-patch.yaml` sont mis a jour
-- ArgoCD synchronise l application cible
+- ArgoCD synchronise automatiquement l application cible
 - MicroK8s deploie les nouveaux pods
 
 ## 7. Arborescence cible

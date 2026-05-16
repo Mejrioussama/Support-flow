@@ -65,8 +65,9 @@ Test-FileContainsNoPattern 'argocd\supportflow-prod.yaml' 'example/support-flow'
 
 Test-FileContainsPattern 'k8s\base\backend-deployment.yaml' 'ghcr\.io/mejrioussama/supportflow-backend' 'Image backend GHCR alignee sur le vrai owner en minuscules'
 Test-FileContainsPattern 'k8s\base\frontend-deployment.yaml' 'ghcr\.io/mejrioussama/supportflow-frontend' 'Image frontend GHCR alignee sur le vrai owner en minuscules'
-Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'ARGOCD_AUTH_TOKEN' 'Workflow CI/CD attend bien le secret ARGOCD_AUTH_TOKEN'
-Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'supportflow-\$\{\{ env\.K8S_ENV \}\}' 'Workflow CI/CD cible bien les applications ArgoCD nommees par environnement'
+Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'syncPolicy\.automated|ArgoCD auto-sync mode' 'La chaine GitOps repose sur l auto-sync ArgoCD'
+Test-FileContainsPattern 'argocd\supportflow-staging.yaml' 'name:\s*supportflow-staging' 'Application ArgoCD staging nommee correctement'
+Test-FileContainsPattern 'argocd\supportflow-prod.yaml' 'name:\s*supportflow-prod' 'Application ArgoCD prod nommee correctement'
 Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'Start ephemeral SonarQube stack' 'Le workflow CI/CD demarre SonarQube localement dans le job d analyse'
 
 $remoteHeads = git ls-remote --heads origin main develop 2>$null
@@ -76,17 +77,7 @@ if ($LASTEXITCODE -eq 0 -and $remoteHeads -match 'refs/heads/main' -and $remoteH
     Add-Fail 'Les branches distantes main et develop doivent exister sur origin'
 }
 
-if ($ArgoCdServer) {
-    Add-Pass 'Valeur fournie pour ARGOCD_SERVER'
-} else {
-    Add-Fail 'ARGOCD_SERVER non fourni pour validation locale'
-}
-
-if ($ArgoCdAuthToken) {
-    Add-Pass 'Valeur fournie pour ARGOCD_AUTH_TOKEN'
-} else {
-    Add-Fail 'ARGOCD_AUTH_TOKEN non fourni pour validation locale'
-}
+Add-Pass 'Aucun secret ArgoCD n est requis pour le mode auto-sync'
 
 if ($CheckRemoteEndpoints) {
     if ($ArgoCdServer) {
@@ -109,8 +100,8 @@ if ($CheckRemoteEndpoints) {
 
 Write-Host ""
 Write-Host "Secrets GitHub Actions a configurer:" -ForegroundColor Cyan
-Write-Host " - ARGOCD_SERVER"
-Write-Host " - ARGOCD_AUTH_TOKEN"
+Write-Host " - aucun secret ArgoCD requis pour l auto-sync"
+Write-Host " - ARGOCD_SERVER / ARGOCD_AUTH_TOKEN seulement si tu veux un controle API explicite"
 Write-Host ""
 Write-Host "Resultat: PASS=$pass | KO=$fail"
 
