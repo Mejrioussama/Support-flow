@@ -10,9 +10,16 @@ Verifier la conformite du sujet sur l analyse qualite `Java + TypeScript` avec `
 - Le backend utilise Maven pour l analyse Java.
 - Le frontend utilise `sonar-scanner` pour l analyse TypeScript.
 
-## Secrets GitHub Actions attendus
-- `SONAR_TOKEN`
-- `SONAR_HOST_URL`
+## Configuration GitHub Actions
+Le workflow ne depend plus d un serveur SonarQube externe.
+
+Il demarre maintenant un SonarQube ephemere directement dans le job CI, puis lance :
+- analyse backend `mvn clean verify sonar:sonar`
+- analyse frontend `npx sonar-scanner`
+
+Donc :
+- `SONAR_HOST_URL` n est plus requis dans GitHub Secrets
+- `SONAR_TOKEN` n est plus requis dans GitHub Secrets
 
 ## Verification locale
 1. Lancer les outils:
@@ -41,5 +48,5 @@ Verifier la conformite du sujet sur l analyse qualite `Java + TypeScript` avec `
 
 ## Resultat attendu
 - SonarQube fonctionne sur PostgreSQL dedie.
-- Les deux analyses backend/frontend passent dans GitHub Actions quand les secrets existent.
+- Les deux analyses backend/frontend passent dans GitHub Actions sans secret Sonar externe.
 - Le dashboard qualite est exploitable comme preuve de conformite du projet.

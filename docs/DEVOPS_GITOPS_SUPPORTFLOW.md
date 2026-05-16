@@ -16,7 +16,7 @@ attendue par le sujet de stage.
 Le workflow `.github/workflows/ci-cd.yml` execute:
 1. build backend Maven
 2. build frontend Angular production
-3. analyse SonarQube backend + frontend si les secrets existent
+3. analyse SonarQube backend + frontend via un SonarQube ephemere lance dans le job CI
 4. scan securite Trivy
 5. build/push des images vers GHCR
 6. mise a jour des overlays `k8s/overlays/<env>/`
@@ -24,8 +24,6 @@ Le workflow `.github/workflows/ci-cd.yml` execute:
 
 ## 4. Secrets attendus
 ### Secrets GitHub Actions
-- `SONAR_TOKEN`
-- `SONAR_HOST_URL`
 - `ARGOCD_SERVER`
 - `ARGOCD_AUTH_TOKEN`
 

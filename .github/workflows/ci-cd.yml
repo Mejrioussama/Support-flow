@@ -42,8 +42,6 @@ jobs:
           fi
 
           missing=()
-          [[ -n "${{ secrets.SONAR_TOKEN }}" ]] || missing+=("SONAR_TOKEN")
-          [[ -n "${{ secrets.SONAR_HOST_URL }}" ]] || missing+=("SONAR_HOST_URL")
           [[ -n "${{ secrets.ARGOCD_SERVER }}" ]] || missing+=("ARGOCD_SERVER")
           [[ -n "${{ secrets.ARGOCD_AUTH_TOKEN }}" ]] || missing+=("ARGOCD_AUTH_TOKEN")
 
@@ -113,8 +111,8 @@ jobs:
   code-quality:
     name: SonarQube Analysis
     runs-on: ubuntu-latest
-    needs: [backend-build, frontend-build, remote-readiness]
-    if: github.event_name != 'pull_request' && needs.remote-readiness.outputs.remote_ready == 'true'
+    needs: [backend-build, frontend-build]
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -132,11 +130,30 @@ jobs:
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm ci
+      - name: Start ephemeral SonarQube stack
+        run: docker compose --profile tools up -d sonarqube-postgres sonarqube
+      - name: Wait for SonarQube to be ready
+        shell: bash
+        run: |
+          for i in {1..90}; do
+            status=$(curl -fsS http://localhost:9000/api/system/status 2>/dev/null | python -c "import sys, json; print(json.load(sys.stdin).get('status', ''))" || true)
+            if [ "$status" = "UP" ]; then
+              echo "SonarQube is UP."
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs supportflow-sonarqube || true
+          exit 1
+      - name: Generate SonarQube token
+        shell: bash
+        run: |
+          response=$(curl -fsS -u admin:admin -X POST "http://localhost:9000/api/user_tokens/generate?name=github-actions-ci")
+          token=$(python -c "import sys, json; print(json.load(sys.stdin)['token'])" <<< "$response")
+          echo "SONAR_HOST_URL=http://localhost:9000" >> "$GITHUB_ENV"
+          echo "SONAR_TOKEN=$token" >> "$GITHUB_ENV"
       - name: Backend SonarQube
         working-directory: ./backend
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: >
           mvn clean verify sonar:sonar
           -Dsonar.projectKey=supportflow-backend
@@ -144,15 +161,15 @@ jobs:
           -Dsonar.login=$SONAR_TOKEN
       - name: Frontend SonarQube
         working-directory: ./frontend
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: >
           npx sonar-scanner
           -Dsonar.projectKey=supportflow-frontend
           -Dsonar.sources=src
           -Dsonar.host.url=$SONAR_HOST_URL
           -Dsonar.login=$SONAR_TOKEN
+      - name: Stop ephemeral SonarQube stack
+        if: always()
+        run: docker compose --profile tools down -v
 
   security-scan:
     name: Security Scan
@@ -178,8 +195,8 @@ jobs:
   docker-build:
     name: Build and Push Images
     runs-on: ubuntu-latest
-    needs: [backend-build, frontend-build, remote-readiness]
-    if: github.event_name != 'pull_request' && needs.remote-readiness.outputs.remote_ready == 'true'
+    needs: [backend-build, frontend-build, security-scan, code-quality]
+    if: github.event_name != 'pull_request'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -219,8 +236,8 @@ jobs:
   update-gitops-manifests:
     name: Update GitOps Manifests
     runs-on: ubuntu-latest
-    needs: docker-build
-    if: github.event_name != 'pull_request' && needs.docker-build.result == 'success'
+    needs: [docker-build, remote-readiness]
+    if: github.event_name != 'pull_request' && needs.docker-build.result == 'success' && needs.remote-readiness.outputs.remote_ready == 'true'
     permissions:
       contents: write
     steps:
@@ -244,8 +261,8 @@ jobs:
   argocd-sync:
     name: Sync ArgoCD
     runs-on: ubuntu-latest
-    needs: update-gitops-manifests
-    if: github.event_name != 'pull_request' && needs.update-gitops-manifests.result == 'success'
+    needs: [update-gitops-manifests, remote-readiness]
+    if: github.event_name != 'pull_request' && needs.update-gitops-manifests.result == 'success' && needs.remote-readiness.outputs.remote_ready == 'true'
     steps:
       - name: Trigger ArgoCD sync
         env:

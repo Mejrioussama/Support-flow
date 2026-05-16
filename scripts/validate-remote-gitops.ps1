@@ -1,6 +1,4 @@
 param(
-    [string]$SonarHostUrl,
-    [string]$SonarToken,
     [string]$ArgoCdServer,
     [string]$ArgoCdAuthToken,
     [switch]$CheckRemoteEndpoints
@@ -67,27 +65,15 @@ Test-FileContainsNoPattern 'argocd\supportflow-prod.yaml' 'example/support-flow'
 
 Test-FileContainsPattern 'k8s\base\backend-deployment.yaml' 'ghcr\.io/Mejrioussama/supportflow-backend' 'Image backend GHCR alignee sur le vrai owner'
 Test-FileContainsPattern 'k8s\base\frontend-deployment.yaml' 'ghcr\.io/Mejrioussama/supportflow-frontend' 'Image frontend GHCR alignee sur le vrai owner'
-Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'SONAR_TOKEN' 'Workflow CI/CD attend bien le secret SONAR_TOKEN'
 Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'ARGOCD_AUTH_TOKEN' 'Workflow CI/CD attend bien le secret ARGOCD_AUTH_TOKEN'
 Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'supportflow-\$\{\{ env\.K8S_ENV \}\}' 'Workflow CI/CD cible bien les applications ArgoCD nommees par environnement'
+Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'Start ephemeral SonarQube stack' 'Le workflow CI/CD demarre SonarQube localement dans le job d analyse'
 
 $remoteHeads = git ls-remote --heads origin main develop 2>$null
 if ($LASTEXITCODE -eq 0 -and $remoteHeads -match 'refs/heads/main' -and $remoteHeads -match 'refs/heads/develop') {
     Add-Pass 'Les branches distantes main et develop existent sur origin'
 } else {
     Add-Fail 'Les branches distantes main et develop doivent exister sur origin'
-}
-
-if ($SonarHostUrl) {
-    Add-Pass 'Valeur fournie pour SONAR_HOST_URL'
-} else {
-    Add-Fail 'SONAR_HOST_URL non fourni pour validation locale'
-}
-
-if ($SonarToken) {
-    Add-Pass 'Valeur fournie pour SONAR_TOKEN'
-} else {
-    Add-Fail 'SONAR_TOKEN non fourni pour validation locale'
 }
 
 if ($ArgoCdServer) {
@@ -103,19 +89,6 @@ if ($ArgoCdAuthToken) {
 }
 
 if ($CheckRemoteEndpoints) {
-    if ($SonarHostUrl) {
-        try {
-            $sonarStatus = Invoke-RestMethod -Uri ($SonarHostUrl.TrimEnd('/') + '/api/system/status') -Method Get -TimeoutSec 20
-            if ($sonarStatus.status) {
-                Add-Pass "Instance SonarQube joignable ($($sonarStatus.status))"
-            } else {
-                Add-Fail 'Instance SonarQube joignable mais reponse inattendue'
-            }
-        } catch {
-            Add-Fail "Instance SonarQube non joignable: $($_.Exception.Message)"
-        }
-    }
-
     if ($ArgoCdServer) {
         try {
             $headers = @{}
@@ -136,8 +109,6 @@ if ($CheckRemoteEndpoints) {
 
 Write-Host ""
 Write-Host "Secrets GitHub Actions a configurer:" -ForegroundColor Cyan
-Write-Host " - SONAR_TOKEN"
-Write-Host " - SONAR_HOST_URL"
 Write-Host " - ARGOCD_SERVER"
 Write-Host " - ARGOCD_AUTH_TOKEN"
 Write-Host ""

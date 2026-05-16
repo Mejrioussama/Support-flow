@@ -13,7 +13,8 @@ Etat actuel du projet :
 - `Build Frontend` : OK
 - `Security Scan` : OK
 - `Remote GitOps Readiness` : OK
-- jobs distants (`Sonar`, `Build and Push Images`, `Update GitOps Manifests`, `Sync ArgoCD`) : **skipped tant que les vrais secrets ne sont pas renseignes**
+- `SonarQube Analysis` : tourne maintenant avec un SonarQube ephemere dans le job CI
+- jobs distants de deploiement (`Update GitOps Manifests`, `Sync ArgoCD`) : **skipped tant que les vrais secrets ArgoCD ne sont pas renseignes**
 
 ## 1. Depot GitHub reel
 Le depot GitHub reel est :
@@ -36,10 +37,6 @@ Le `remote origin` doit pointer vers cette URL.
 ## 3. Secrets GitHub Actions a creer
 Dans `GitHub -> Settings -> Secrets and variables -> Actions -> New repository secret`, creer :
 
-- `SONAR_TOKEN`
-  - token d analyse SonarQube
-- `SONAR_HOST_URL`
-  - exemple : `https://sonar.votre-domaine.tld`
 - `ARGOCD_SERVER`
   - exemple : `https://argocd.votre-domaine.tld`
 - `ARGOCD_AUTH_TOKEN`
@@ -47,8 +44,13 @@ Dans `GitHub -> Settings -> Secrets and variables -> Actions -> New repository s
 
 ## 4. Recuperer les vraies valeurs
 ### SonarQube
-- URL : l URL publique de ton instance SonarQube
-- Token : dans SonarQube -> `My Account -> Security -> Generate Tokens`
+Plus besoin de secret SonarQube dans GitHub Actions.
+
+Le workflow demarre maintenant :
+- `sonarqube-postgres`
+- `sonarqube`
+
+directement dans le job CI, puis genere un token temporaire pour l analyse.
 
 ### ArgoCD
 - URL : l URL publique de ton serveur ArgoCD
@@ -76,8 +78,6 @@ Avec les vraies valeurs :
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\validate-remote-gitops.ps1 `
-  -SonarHostUrl "https://sonar.votre-domaine.tld" `
-  -SonarToken "<token-sonar>" `
   -ArgoCdServer "https://argocd.votre-domaine.tld" `
   -ArgoCdAuthToken "<token-argocd>" `
   -CheckRemoteEndpoints
@@ -86,8 +86,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\validate-remote-gitops.ps1 `
 ## 6. Comportement du workflow
 Le job `Remote GitOps Readiness`:
 - ne casse plus inutilement la CI locale
-- resume clairement les secrets manquants
-- active les jobs distants seulement quand la configuration est complete
+- resume clairement les secrets ArgoCD manquants
+- active les jobs de deploiement seulement quand la configuration est complete
+
+Le job `SonarQube Analysis` :
+- ne depend plus d un SonarQube externe
+- lance son propre SonarQube ephemere dans GitHub Actions
+- n exige plus `SONAR_HOST_URL` ni `SONAR_TOKEN`
 
 Donc :
 - push sur `develop` -> cible `staging`
@@ -123,6 +128,5 @@ Puis verifier :
 Le depot est pret, mais **les vraies valeurs distantes** ne sont pas stockees ici.
 
 Pour terminer completement la chaine distante, il reste seulement a :
-1. creer les 4 secrets GitHub
-2. verifier l accessibilite reelle de SonarQube
-3. verifier l accessibilite reelle d ArgoCD
+1. creer les 2 secrets GitHub ArgoCD
+2. verifier l accessibilite reelle d ArgoCD
