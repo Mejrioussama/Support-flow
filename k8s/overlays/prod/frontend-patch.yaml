@@ -8,4 +8,4 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/mejrioussama/supportflow-frontend:sha-5195c93f8f54ce997cb6a6779cbdb522776cac4c
+          image: ghcr.io/mejrioussama/supportflow-frontend:sha-9b6a4fa31608b6c46627388256c92db3a016dadf
