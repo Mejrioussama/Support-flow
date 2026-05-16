@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supportflow-backend
+  namespace: supportflow
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/mejrioussama/supportflow-backend:staging

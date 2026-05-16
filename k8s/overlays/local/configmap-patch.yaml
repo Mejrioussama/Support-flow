@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supportflow-config
+  namespace: supportflow
+data:
+  KEYCLOAK_ISSUER_URI: http://host.docker.internal:8180/realms/supportflow
+  KEYCLOAK_JWK_URI: http://host.docker.internal:8180/realms/supportflow/protocol/openid-connect/certs
+  KEYCLOAK_ADMIN_URL: http://host.docker.internal:8180
+  SUPPORTFLOW_SECURITY_PORTAL_URL: http://host.docker.internal:8180/realms/supportflow/account
+  ALFRESCO_URL: http://host.docker.internal:8090/alfresco/api/-default-/public/cmis/versions/1.1/atom
+  AI_AGENT_URL: http://host.docker.internal:8000

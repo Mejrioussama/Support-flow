@@ -67,6 +67,8 @@ default-roles.json
 opencode.json
 external-skills/
 .m2wrapper/
+tools/
+.kind-cluster.yaml
 
 # Test outputs
 test-results-*.csv
