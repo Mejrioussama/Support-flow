@@ -16,9 +16,9 @@ env:
   JAVA_VERSION: '17'
   NODE_VERSION: '18'
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ghcr.io/${{ github.repository_owner }}
-  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/supportflow-backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/supportflow-frontend
+  IMAGE_NAMESPACE: ghcr.io/mejrioussama
+  BACKEND_IMAGE: ghcr.io/mejrioussama/supportflow-backend
+  FRONTEND_IMAGE: ghcr.io/mejrioussama/supportflow-frontend
   K8S_ENV: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
 
 jobs:

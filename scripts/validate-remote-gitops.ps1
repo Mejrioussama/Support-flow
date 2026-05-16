@@ -63,8 +63,8 @@ Test-FileContainsPattern 'argocd\supportflow-prod.yaml' 'repoURL:\s*https://gith
 Test-FileContainsNoPattern 'argocd\supportflow-staging.yaml' 'example/support-flow' 'ArgoCD staging ne reference plus le repo exemple'
 Test-FileContainsNoPattern 'argocd\supportflow-prod.yaml' 'example/support-flow' 'ArgoCD prod ne reference plus le repo exemple'
 
-Test-FileContainsPattern 'k8s\base\backend-deployment.yaml' 'ghcr\.io/Mejrioussama/supportflow-backend' 'Image backend GHCR alignee sur le vrai owner'
-Test-FileContainsPattern 'k8s\base\frontend-deployment.yaml' 'ghcr\.io/Mejrioussama/supportflow-frontend' 'Image frontend GHCR alignee sur le vrai owner'
+Test-FileContainsPattern 'k8s\base\backend-deployment.yaml' 'ghcr\.io/mejrioussama/supportflow-backend' 'Image backend GHCR alignee sur le vrai owner en minuscules'
+Test-FileContainsPattern 'k8s\base\frontend-deployment.yaml' 'ghcr\.io/mejrioussama/supportflow-frontend' 'Image frontend GHCR alignee sur le vrai owner en minuscules'
 Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'ARGOCD_AUTH_TOKEN' 'Workflow CI/CD attend bien le secret ARGOCD_AUTH_TOKEN'
 Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'supportflow-\$\{\{ env\.K8S_ENV \}\}' 'Workflow CI/CD cible bien les applications ArgoCD nommees par environnement'
 Test-FileContainsPattern '.github\workflows\ci-cd.yml' 'Start ephemeral SonarQube stack' 'Le workflow CI/CD demarre SonarQube localement dans le job d analyse'

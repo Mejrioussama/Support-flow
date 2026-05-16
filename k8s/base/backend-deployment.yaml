@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ghcr.io/Mejrioussama/supportflow-backend:staging
+          image: ghcr.io/mejrioussama/supportflow-backend:staging
           ports:
             - containerPort: 8080
           envFrom:

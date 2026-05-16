@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-$imageNamespace = "ghcr.io/$GitHubOwner"
+$imageNamespace = "ghcr.io/$($GitHubOwner.ToLowerInvariant())"
 
 function Update-File {
     param(

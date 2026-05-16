@@ -15,6 +15,6 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/Mejrioussama/supportflow-frontend:staging
+          image: ghcr.io/mejrioussama/supportflow-frontend:staging
           ports:
             - containerPort: 80

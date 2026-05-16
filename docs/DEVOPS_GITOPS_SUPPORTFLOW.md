@@ -5,11 +5,11 @@ Cette documentation formalise la chaine `GitHub Actions -> GHCR -> manifests Kub
 attendue par le sujet de stage.
 
 ## 2. Images conteneur
-- Backend: `ghcr.io/Mejrioussama/supportflow-backend`
-- Frontend: `ghcr.io/Mejrioussama/supportflow-frontend`
+- Backend: `ghcr.io/mejrioussama/supportflow-backend`
+- Frontend: `ghcr.io/mejrioussama/supportflow-frontend`
 - Les manifests Kubernetes versionnes utilisent maintenant un bootstrap coherent:
-  - `ghcr.io/Mejrioussama/supportflow-backend:staging`
-  - `ghcr.io/Mejrioussama/supportflow-frontend:staging`
+  - `ghcr.io/mejrioussama/supportflow-backend:staging`
+  - `ghcr.io/mejrioussama/supportflow-frontend:staging`
 - Le workflow remplace automatiquement ces tags par des tags `sha-<commit>` lors d un vrai run CI.
 
 ## 3. Pipeline GitHub Actions

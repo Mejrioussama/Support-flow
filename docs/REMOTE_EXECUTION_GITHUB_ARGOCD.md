@@ -27,7 +27,7 @@ Le `remote origin` doit pointer vers cette URL.
 
 ## 2. Ce qui est deja pret dans le depot
 - les manifests ArgoCD pointent vers le vrai repo
-- les images GHCR utilisent `ghcr.io/Mejrioussama`
+- les images GHCR utilisent `ghcr.io/mejrioussama`
 - les branches `main` et `develop` existent
 - le workflow `.github/workflows/ci-cd.yml` sait:
   - valider la readiness distante

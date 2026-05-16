@@ -8,4 +8,4 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/Mejrioussama/supportflow-frontend:prod
+          image: ghcr.io/mejrioussama/supportflow-frontend:prod
