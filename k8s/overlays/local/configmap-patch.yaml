@@ -4,6 +4,9 @@ metadata:
   name: supportflow-config
   namespace: supportflow
 data:
+  SPRING_DATASOURCE_URL: jdbc:mysql://supportflow-mysql:3306/supportflow_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+  SPRING_DATASOURCE_USERNAME: supportflow
+  SPRING_DATASOURCE_PASSWORD: supportflow123
   KEYCLOAK_ISSUER_URI: http://host.docker.internal:8180/realms/supportflow
   KEYCLOAK_JWK_URI: http://host.docker.internal:8180/realms/supportflow/protocol/openid-connect/certs
   KEYCLOAK_ADMIN_URL: http://host.docker.internal:8180
