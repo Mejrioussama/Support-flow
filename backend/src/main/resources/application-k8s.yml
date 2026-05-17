@@ -5,6 +5,14 @@
 server:
   port: 8080
 
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/supportflow}
+          jwk-set-uri: ${KEYCLOAK_JWK_URI:http://host.docker.internal:8180/realms/supportflow/protocol/openid-connect/certs}
+
 management:
   health:
     camunda:

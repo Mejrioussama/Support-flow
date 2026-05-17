@@ -9,6 +9,7 @@ import { KeycloakAngularModule, KeycloakBearerInterceptor, KeycloakService } fro
 import { AppComponent } from './app/app.component';
 import { routes } from './app/app.routes';
 import { environment } from './environments/environment';
+import { authTokenInterceptor } from './app/core/interceptors/auth-token.interceptor';
 import { errorInterceptor } from './app/core/interceptors/error.interceptor';
 
 // Some browser-only dependencies still probe for the Node global object.
@@ -109,7 +110,7 @@ bootstrapApplication(AppComponent, {
   providers: [
     provideAnimations(),
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([errorInterceptor]), withInterceptorsFromDi()),
+    provideHttpClient(withInterceptors([authTokenInterceptor, errorInterceptor]), withInterceptorsFromDi()),
     importProvidersFrom(KeycloakAngularModule),
     {
       provide: HTTP_INTERCEPTORS,
@@ -127,4 +128,22 @@ bootstrapApplication(AppComponent, {
       registrationStrategy: 'registerWhenStable:30000'
     })
   ]
-}).catch(err => console.error(err));
+}).catch(err => {
+  console.error(err);
+  const body = document.body;
+  if (body) {
+    const banner = document.createElement('pre');
+    banner.style.position = 'fixed';
+    banner.style.inset = '16px';
+    banner.style.zIndex = '99999';
+    banner.style.padding = '16px';
+    banner.style.background = 'rgba(17, 24, 39, 0.95)';
+    banner.style.color = '#fca5a5';
+    banner.style.border = '1px solid rgba(248, 113, 113, 0.5)';
+    banner.style.borderRadius = '12px';
+    banner.style.overflow = 'auto';
+    banner.style.whiteSpace = 'pre-wrap';
+    banner.textContent = `SupportFlow bootstrap error:\n${err instanceof Error ? err.stack ?? err.message : String(err)}`;
+    body.appendChild(banner);
+  }
+});

@@ -28,9 +28,10 @@ import { WebSocketService, NotificationService } from '@core/services';
   template: `
     @if (!initialized) {
       <div class="loading-screen">
-        <!-- 3D Loader Container -->
-        <div #loaderCanvas class="three-canvas"></div>
-        <div class="loading-content glass-panel">
+        @if (!safeVisualMode) {
+          <div #loaderCanvas class="three-canvas"></div>
+        }
+        <div class="loading-content glass-panel" [class.safe-mode]="safeVisualMode">
           <h1 class="neon-text">SupportFlow</h1>
           <div class="glow-spinner"></div>
           <p>Initialisation du système...</p>
@@ -62,10 +63,11 @@ import { WebSocketService, NotificationService } from '@core/services';
       </div>
     } @else {
       <div class="login-container">
-        <!-- 3D Login Background Container -->
-        <div #loginCanvas class="three-canvas"></div>
+        @if (!safeVisualMode) {
+          <div #loginCanvas class="three-canvas"></div>
+        }
         
-        <div class="login-card glass-panel highlight-border">
+        <div class="login-card glass-panel highlight-border" [class.safe-mode]="safeVisualMode">
           <div class="logo-wrapper">
             <mat-icon class="neon-icon">blur_on</mat-icon>
             <h1 class="neon-title">SupportFlow</h1>
@@ -157,6 +159,14 @@ import { WebSocketService, NotificationService } from '@core/services';
         text-align: center;
         border-radius: 24px;
         box-shadow: 0 0 50px rgba(59, 130, 246, 0.2);
+        background: rgba(7, 9, 19, 0.82);
+        border: 1px solid rgba(59, 130, 246, 0.18);
+
+        &.safe-mode {
+          min-width: 340px;
+          backdrop-filter: none !important;
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+        }
         
         .neon-text {
           font-size: 36px;
@@ -214,6 +224,15 @@ import { WebSocketService, NotificationService } from '@core/services';
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(59, 130, 246, 0.2) inset !important;
       backdrop-filter: blur(20px) !important;
       animation: floatCard 6s ease-in-out infinite;
+      background: rgba(7, 9, 19, 0.86);
+      border: 1px solid rgba(59, 130, 246, 0.22);
+
+      &.safe-mode {
+        animation: none;
+        min-width: 360px;
+        backdrop-filter: none !important;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45) !important;
+      }
 
       .logo-wrapper {
         display: flex;
@@ -326,6 +345,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   isLoggedIn = false;
   sidebarCollapsed = false;
   initialized = false;
+  safeVisualMode = false;
   private router = inject(Router);
   private toastSub: Subscription | null = null;
 
@@ -378,6 +398,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   async ngOnInit() {
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('theme');
+      this.safeVisualMode = window.location.port === '30088' || window.location.port === '30086';
       if (savedTheme === 'light') {
         document.body.classList.add('light-theme');
       } else {
@@ -418,6 +439,9 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   ngAfterViewInit() {
     // Initialize 3D depending on what is shown
     setTimeout(() => {
+      if (this.safeVisualMode) {
+        return;
+      }
       if (!this.initialized && this.loaderCanvasRef) {
         this.initThreeJs(this.loaderCanvasRef.nativeElement, true);
       } else if (!this.isLoggedIn && this.loginCanvasRef) {
