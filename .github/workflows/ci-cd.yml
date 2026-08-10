@@ -333,7 +333,7 @@ jobs:
     # upstream dependency can't push an arbitrary image reference straight to a running prod
     # deployment - this workflow change alone does not enforce that; the Environment's protection
     # rules must still be configured in the repo settings for "prod" to actually gate anything.
-    environment: ${{ env.K8S_ENV }}
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
     steps:
       - uses: actions/checkout@v4
         with:
