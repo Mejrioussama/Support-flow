@@ -207,7 +207,7 @@ jobs:
         shell: bash
         run: |
           for i in {1..90}; do
-            status=$(curl -fsS http://localhost:9000/api/system/status 2>/dev/null | python -c "import sys, json; print(json.load(sys.stdin).get('status', ''))" || true)
+            status=$(curl -fsS http://localhost:9000/api/system/status 2>/dev/null | grep -o '"status":"[A-Z]*"' | cut -d'"' -f4 || true)
             if [ "$status" = "UP" ]; then
               echo "SonarQube is UP."
               exit 0
@@ -220,7 +220,7 @@ jobs:
         shell: bash
         run: |
           response=$(curl -fsS -u admin:admin -X POST "http://localhost:9000/api/user_tokens/generate?name=github-actions-ci")
-          token=$(python -c "import sys, json; print(json.load(sys.stdin)['token'])" <<< "$response")
+          token=$(grep -o '"token":"[^"]*"' <<< "$response" | cut -d'"' -f4)
           echo "SONAR_HOST_URL=http://localhost:9000" >> "$GITHUB_ENV"
           echo "SONAR_TOKEN=$token" >> "$GITHUB_ENV"
       - name: Backend SonarQube
@@ -253,7 +253,7 @@ jobs:
       # checksum verification). Report step never fails the job, so the SARIF upload always runs
       # even when vulnerabilities are found.
       - name: Trivy filesystem scan (report)
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scan-ref: .
@@ -269,7 +269,7 @@ jobs:
       # Critical/High findings never blocked docker-build/deploy. This fails the job (and the
       # docker-build/update-gitops-manifests/argocd-sync chain that depends on it) on real findings.
       - name: Trivy filesystem scan (fail on Critical/High)
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scan-ref: .
