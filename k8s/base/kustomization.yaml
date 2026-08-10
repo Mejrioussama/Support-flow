@@ -3,11 +3,15 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - configmap.yaml
-  - app-secrets.yaml
   - mysql-pvc.yaml
+  - mysql-init-configmap.yaml
   - mysql-deployment.yaml
   - mysql-service.yaml
   - backend-deployment.yaml
   - backend-service.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
+  - frontend-runtime-configmap.yaml
+  - default-deny-network-policy.yaml
+  - application-network-policy.yaml
+  - backend-pdb.yaml

@@ -1,19 +1,18 @@
 package com.supportflow.config;
 
+import com.supportflow.security.KeycloakRoleExtractor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -23,145 +22,88 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Arrays;
+import java.util.List;
 
-/**
- * Configuration de la sécurité Spring Security avec OAuth2/JWT
- */
+/** Production security: stateless Keycloak JWT authentication. */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 @Profile("!dev")
 @RequiredArgsConstructor
 public class SecurityConfig {
-    
+
+    private final KeycloakRoleExtractor roleExtractor;
+
+    @Value("#{'${supportflow.security.allowed-origins:http://localhost:4200,http://127.0.0.1:4200}'.split(',')}")
+    private List<String> allowedOrigins;
+
     /**
-     * Completely bypass Spring Security for Camunda webapp and REST API.
-     * Camunda has its own authentication (LazySecurityFilter) and CSRF protection.
+     * Only the Camunda webapp's own UI/asset/session-proxy paths are exempted here — those are
+     * already gated by Camunda's built-in webapp login (camunda.bpm.admin-user, cookie session).
+     * The raw process-engine REST API (/engine-rest/**) is deliberately NOT exempted: that starter
+     * ships with no authentication of its own, so leaving it in this bypass list made it a fully
+     * open, unauthenticated process-engine API (capable of deploying BPMN with script tasks) on
+     * any deployment where the backend port is reachable. It is instead locked down to ADMIN-role
+     * JWT auth below, in the normal filter chain.
      */
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
-        return (web) -> web.ignoring()
-            .requestMatchers(request -> {
-                String uri = request.getRequestURI();
-                String ctx = request.getContextPath();
-                String path = uri.substring(ctx.length());
-                return path.startsWith("/camunda/") || path.startsWith("/engine-rest/")
-                    || path.equals("/camunda") || path.equals("/engine-rest");
-            });
+        return web -> web.ignoring().requestMatchers(request -> {
+            String uri = request.getRequestURI();
+            String contextPath = request.getContextPath();
+            String path = uri.substring(contextPath.length());
+            return path.startsWith("/camunda/app/")
+                || path.startsWith("/camunda/api/")
+                || path.startsWith("/camunda/lib/")
+                || path.startsWith("/camunda/assets/");
+        });
     }
 
-    /**
-     * Main API security chain — stateless JWT (Keycloak OAuth2).
-     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> 
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Endpoints publics
-                .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/auth/**").permitAll()
-                .requestMatchers("/ws/**").permitAll()
-                .requestMatchers("/error").permitAll()
-                // Tous les autres endpoints nécessitent une authentification
-                .anyRequest().authenticated()
-            )
+                .requestMatchers("/ws/**", "/error").permitAll()
+                .requestMatchers("/engine-rest/**", "/engine-rest").hasRole("ADMIN")
+                .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
-            );
-        
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
         return http.build();
     }
-    
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",
-            "http://127.0.0.1:*"
-        ));
-        configuration.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
-        ));
-        configuration.setAllowedHeaders(Arrays.asList(
-            "Authorization", "Content-Type", "X-Requested-With", "Accept"
-        ));
-        configuration.setExposedHeaders(Arrays.asList(
-            "Authorization", "Content-Disposition"
-        ));
+        List<String> configuredOrigins = allowedOrigins.stream().map(String::trim).filter(origin -> !origin.isBlank()).toList();
+        if (configuredOrigins.isEmpty() || configuredOrigins.contains("*")) {
+            throw new IllegalStateException("Production CORS requires explicit allowed origins");
+        }
+        configuration.setAllowedOrigins(configuredOrigins);
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "X-Request-ID"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Disposition", "X-Request-ID"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
-        
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
-    
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-    
-    /**
-     * Convertit les claims JWT Keycloak en authorities Spring Security
-     */
+
     @Bean
     public Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            Collection<GrantedAuthority> authorities = new ArrayList<>();
-            
-            // Extraire les rôles du claim "roles" (flat)
-            List<String> flatRoles = jwt.getClaimAsStringList("roles");
-            if (flatRoles != null) {
-                authorities.addAll(
-                    flatRoles.stream()
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
-                        .collect(Collectors.toList())
-                );
-            }
-            
-            // Extraire les rôles du realm_access (nested)
-            Map<String, Object> realmAccess = jwt.getClaim("realm_access");
-            if (realmAccess != null) {
-                @SuppressWarnings("unchecked")
-                List<String> roles = (List<String>) realmAccess.get("roles");
-                if (roles != null) {
-                    authorities.addAll(
-                        roles.stream()
-                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
-                            .collect(Collectors.toList())
-                    );
-                }
-            }
-            
-            // Extraire les rôles du resource_access (client-specific)
-            Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
-            if (resourceAccess != null) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> clientAccess = (Map<String, Object>) resourceAccess.get("supportflow-client");
-                if (clientAccess != null) {
-                    @SuppressWarnings("unchecked")
-                    List<String> clientRoles = (List<String>) clientAccess.get("roles");
-                    if (clientRoles != null) {
-                        authorities.addAll(
-                            clientRoles.stream()
-                                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
-                                .collect(Collectors.toList())
-                        );
-                    }
-                }
-            }
-            
-            return authorities;
-        });
-        
+        converter.setJwtGrantedAuthoritiesConverter(roleExtractor::extractAuthorities);
         return converter;
     }
 }

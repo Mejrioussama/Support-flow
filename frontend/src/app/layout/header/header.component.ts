@@ -9,7 +9,7 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { MatDividerModule } from '@angular/material/divider';
 import { Subscription } from 'rxjs';
 
-import { AuthService, NotificationService } from '@core/services';
+import { AuthService, NotificationService, WebSocketService } from '@core/services';
 import { Notification, isSlaNotification } from '@core/models';
 import { SlaNotificationItemComponent } from '@shared/components/sla-notification-item/sla-notification-item.component';
 
@@ -465,6 +465,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   constructor(
     private authService: AuthService,
     private notificationService: NotificationService,
+    private webSocketService: WebSocketService,
     private router: Router
   ) { }
 
@@ -563,7 +564,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
   }
 
   logout() {
-    this.authService.logout();
+    this.webSocketService.disconnect();
+    void this.authService.logout();
   }
 
   private getInitials(name: string): string {

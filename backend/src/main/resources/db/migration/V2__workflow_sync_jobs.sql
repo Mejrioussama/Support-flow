@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS workflow_sync_jobs (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    ticket_id BIGINT NOT NULL,
+    action VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    payload TEXT NULL,
+    idempotency_key VARCHAR(160) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 8,
+    next_attempt_at DATETIME(6) NOT NULL,
+    last_error VARCHAR(1000) NULL,
+    completed_at DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NULL,
+    created_by VARCHAR(255) NULL,
+    updated_by VARCHAR(255) NULL,
+    version BIGINT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_workflow_sync_idempotency UNIQUE (idempotency_key),
+    CONSTRAINT fk_workflow_sync_ticket FOREIGN KEY (ticket_id) REFERENCES tickets (id),
+    INDEX idx_workflow_sync_due (status, next_attempt_at),
+    INDEX idx_workflow_sync_ticket (ticket_id, created_at)
+) ENGINE=InnoDB;

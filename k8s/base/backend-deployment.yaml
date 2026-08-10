@@ -13,25 +13,82 @@ spec:
       labels:
         app: supportflow-backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: backend
           image: ghcr.io/mejrioussama/supportflow-backend:staging
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
           envFrom:
             - configMapRef:
                 name: supportflow-config
-            - secretRef:
-                name: supportflow-secrets
+          # Explicit, scoped secret references instead of envFrom: secretRef on the whole
+          # supportflow-secrets Secret. That previously exposed MYSQL_ROOT_PASSWORD to the
+          # backend container's environment even though only mysql itself needs it - the backend
+          # only ever authenticates with its own scoped DB_USERNAME/DB_PASSWORD. Scoping this
+          # also makes it explicit which secrets the backend actually consumes.
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: supportflow-secrets
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: supportflow-secrets
+                  key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: supportflow-secrets
+                  key: JWT_SECRET
+            - name: ALFRESCO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: supportflow-secrets
+                  key: ALFRESCO_USERNAME
+            - name: ALFRESCO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: supportflow-secrets
+                  key: ALFRESCO_PASSWORD
           readinessProbe:
             httpGet:
-              path: /api/actuator/health
+              path: /api/actuator/health/readiness
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
           livenessProbe:
             httpGet:
-              path: /api/actuator/health
+              path: /api/actuator/health/liveness
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /api/actuator/health/liveness
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1536Mi

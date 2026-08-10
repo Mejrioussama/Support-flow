@@ -686,7 +686,7 @@ public class ReportService {
         for (TicketHistory historyEntry : historyEntries) {
             Row row = sheet.createRow(rowNum++);
             row.createCell(0).setCellValue(formatDate(historyEntry.getCreatedAt()));
-            row.createCell(1).setCellValue(label(historyEntry.getAction()));
+            row.createCell(1).setCellValue(label(historyEntry.getAction() != null ? historyEntry.getAction().name() : null));
             row.createCell(2).setCellValue(label(historyEntry.getFieldName()));
             row.createCell(3).setCellValue(label(historyEntry.getOldValue()));
             row.createCell(4).setCellValue(label(historyEntry.getNewValue()));
@@ -736,7 +736,7 @@ public class ReportService {
         for (TicketHistory historyEntry : historyEntries) {
             rows.add(String.join(",",
                 csv(formatDate(historyEntry.getCreatedAt())),
-                csv(historyEntry.getAction()),
+                csv(historyEntry.getAction() != null ? historyEntry.getAction().name() : null),
                 csv(historyEntry.getFieldName()),
                 csv(historyEntry.getOldValue()),
                 csv(historyEntry.getNewValue()),

@@ -76,6 +76,38 @@ jobs:
       - name: Maven verify
         run: mvn clean verify -DskipTests=false
 
+  migration-validation:
+    name: Validate MySQL Migrations
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create empty and restored-schema databases
+        run: |
+          mysql -h127.0.0.1 -uroot -proot -e "CREATE DATABASE supportflow_empty; CREATE DATABASE supportflow_existing;"
+          mysql -h127.0.0.1 -uroot -proot supportflow_existing < backend/src/main/resources/db/migration/V1__baseline_schema.sql
+          mysql -h127.0.0.1 -uroot -proot supportflow_existing -e "INSERT INTO clients (created_at, code, company_name) VALUES (NOW(6), 'CI', 'CI Client'); INSERT INTO tickets (created_at, reference, title, type, status, severity, impact, priority, client_id) VALUES (NOW(6), 'SF-9000', 'Migration preservation check', 'INCIDENT', 'NEW', 'LOW', 'LOW', 'LOW', 1);"
+      - name: Migrate an empty database
+        run: |
+          docker run --rm --network host -v "$PWD/backend/src/main/resources/db/migration:/flyway/sql:ro" flyway/flyway:9.22.3-alpine -url="jdbc:mysql://127.0.0.1:3306/supportflow_empty?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=root migrate
+      - name: Baseline and migrate a restored current schema
+        run: |
+          docker run --rm --network host -v "$PWD/backend/src/main/resources/db/migration:/flyway/sql:ro" flyway/flyway:9.22.3-alpine -url="jdbc:mysql://127.0.0.1:3306/supportflow_existing?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=root -baselineVersion=1 baseline
+          docker run --rm --network host -v "$PWD/backend/src/main/resources/db/migration:/flyway/sql:ro" flyway/flyway:9.22.3-alpine -url="jdbc:mysql://127.0.0.1:3306/supportflow_existing?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=root migrate
+          test "$(mysql -N -h127.0.0.1 -uroot -proot supportflow_existing -e "SELECT COUNT(*) FROM tickets WHERE reference='SF-9000'")" = "1"
+          test "$(mysql -N -h127.0.0.1 -uroot -proot supportflow_existing -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='supportflow_existing' AND table_name='workflow_sync_jobs'")" = "1"
+
   frontend-build:
     name: Build Frontend
     runs-on: ubuntu-latest
@@ -91,8 +123,61 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Unit tests
+        run: npm test -- --watch=false --browsers=ChromeHeadless
       - name: Build production
         run: npm run build -- --configuration=production
+
+  kubernetes-validation:
+    name: Validate Kubernetes Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+      - name: Render all overlays
+        shell: bash
+        run: |
+          kubectl kustomize k8s/overlays/local > /tmp/supportflow-local.yaml
+          kubectl kustomize k8s/overlays/staging > /tmp/supportflow-staging.yaml
+          kubectl kustomize k8s/overlays/prod > /tmp/supportflow-prod.yaml
+      - name: Reject committed runtime secrets
+        shell: bash
+        run: |
+          if grep -R --include='*.yaml' --exclude='*.example.yaml' -E '^[[:space:]]+(DB_PASSWORD|MYSQL_ROOT_PASSWORD|JWT_SECRET|ALFRESCO_PASSWORD):[[:space:]]+[^<].+' k8s/base k8s/overlays; then
+            echo 'A runtime secret appears to be committed in Kubernetes manifests.'
+            exit 1
+          fi
+
+  compose-smoke:
+    name: Docker Compose Workflow Smoke
+    runs-on: ubuntu-latest
+    needs: [backend-build, migration-validation]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start core workflow stack
+        run: docker compose up -d --build mysql keycloak backend
+      - name: Verify readiness and production auth lockdown
+        shell: bash
+        run: |
+          for i in {1..90}; do
+            if curl -fsS http://localhost:8082/api/actuator/health/readiness >/dev/null; then
+              break
+            fi
+            if [ "$i" = 90 ]; then
+              docker compose logs backend keycloak mysql
+              exit 1
+            fi
+            sleep 5
+          done
+          auth_status=$(curl -sS -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{"username":"ci","password":"ci"}' http://localhost:8082/api/auth/login)
+          test "$auth_status" = "401" -o "$auth_status" = "404"
+          curl -fsS http://localhost:8082/api/actuator/health/integrations >/dev/null
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
 
   code-quality:
     name: SonarQube Analysis
@@ -163,25 +248,39 @@ jobs:
     needs: [backend-build, frontend-build]
     steps:
       - uses: actions/checkout@v4
-      - name: Install Trivy CLI
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Trivy filesystem scan
-        shell: bash
-        run: trivy fs --format sarif --output trivy-results.sarif .
+      # Maintained GitHub Action pinned to a specific release, instead of the previous
+      # `curl https://.../main/contrib/install.sh | sh` (fetched from a mutable branch with no
+      # checksum verification). Report step never fails the job, so the SARIF upload always runs
+      # even when vulnerabilities are found.
+      - name: Trivy filesystem scan (report)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: 0
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
         continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
+      # Gate step: previously `trivy fs` ran with no --exit-code, so it always exited 0 and
+      # Critical/High findings never blocked docker-build/deploy. This fails the job (and the
+      # docker-build/update-gitops-manifests/argocd-sync chain that depends on it) on real findings.
+      - name: Trivy filesystem scan (fail on Critical/High)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: 1
 
   docker-build:
     name: Build and Push Images
     runs-on: ubuntu-latest
-    needs: [backend-build, frontend-build, security-scan, code-quality]
+    needs: [backend-build, frontend-build, migration-validation, kubernetes-validation, compose-smoke, security-scan, code-quality]
     if: github.event_name != 'pull_request'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
@@ -226,6 +325,15 @@ jobs:
     if: github.event_name != 'pull_request' && needs.docker-build.result == 'success' && needs.remote-readiness.outputs.remote_ready == 'true'
     permissions:
       contents: write
+    # Every prior job (build/test/scan) runs attacker-influenceable code (mvn/npm dependency
+    # resolution, Trivy, SonarQube) with the same ambient GITHUB_TOKEN this job then uses with
+    # contents: write to push straight to main/develop, which ArgoCD auto-syncs to the cluster
+    # with no further human checkpoint. Declaring a GitHub Environment here lets a repo admin
+    # attach required-reviewer protection rules (Settings > Environments > prod) so a compromised
+    # upstream dependency can't push an arbitrary image reference straight to a running prod
+    # deployment - this workflow change alone does not enforce that; the Environment's protection
+    # rules must still be configured in the repo settings for "prod" to actually gate anything.
+    environment: ${{ env.K8S_ENV }}
     steps:
       - uses: actions/checkout@v4
         with:

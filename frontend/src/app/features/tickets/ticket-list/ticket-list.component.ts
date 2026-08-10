@@ -22,7 +22,7 @@ import { TableModule } from 'primeng/table';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { firstValueFrom } from 'rxjs';
 
-import { TicketService, AuthService } from '@core/services';
+import { TicketService, AuthService, TicketAction } from '@core/services';
 import { Ticket, TicketStatus, TicketPriority, Page, WaitingOn } from '@core/models';
 import { SlaIndicatorComponent } from '@shared/components';
 import { AssignDialogComponent, AssignDialogData, AssignDialogResult } from '../assign-dialog/assign-dialog.component';
@@ -1055,7 +1055,7 @@ export class TicketListComponent implements OnInit {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   }
 
-  canAct(ticket: Ticket, action: string): boolean {
+  canAct(ticket: Ticket, action: TicketAction): boolean {
     return this.authService.canActOnTicket(ticket, action);
   }
 

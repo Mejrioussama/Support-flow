@@ -349,7 +349,7 @@ class EscalationServiceTest {
             escalationService.escalateLevel3(100L);
 
             verify(historyRepository).save(argThat(h ->
-                h.getAction().equals("ESCALATION_L3_FAILED")));
+                h.getAction().equals(TicketHistoryAction.ESCALATION_L3_FAILED)));
             verify(eventRepository).save(argThat(e ->
                 e.getReason() == EscalationReason.NO_AGENT_AVAILABLE));
         }
@@ -464,7 +464,7 @@ class EscalationServiceTest {
                 assertEquals("Investigating root cause", ticket.getEscalationHoldReason());
                 return true;
             }));
-            verify(historyRepository).save(argThat(h -> h.getAction().equals("ESCALATION_HOLD")));
+            verify(historyRepository).save(argThat(h -> h.getAction().equals(TicketHistoryAction.ESCALATION_HOLD)));
             verify(eventRepository).save(argThat(e -> e.getReason() == EscalationReason.HOLD_ACTIVE));
         }
 
@@ -495,7 +495,7 @@ class EscalationServiceTest {
                 assertNull(ticket.getEscalationHoldReason());
                 return true;
             }));
-            verify(historyRepository).save(argThat(h -> h.getAction().equals("ESCALATION_HOLD_RELEASED")));
+            verify(historyRepository).save(argThat(h -> h.getAction().equals(TicketHistoryAction.ESCALATION_HOLD_RELEASED)));
         }
 
         @Test
@@ -605,7 +605,7 @@ class EscalationServiceTest {
 
             when(ticketRepository.findSlaEscalatedWithoutRecentAction(any())).thenReturn(List.of(testTicket));
             when(policyRepository.findPolicyForClient(1L)).thenReturn(null);
-            when(historyRepository.existsByTicketIdAndActionAndCreatedAtAfter(eq(100L), eq("ESCALATION_L3"), any()))
+            when(historyRepository.existsByTicketIdAndActionAndCreatedAtAfter(eq(100L), eq(TicketHistoryAction.ESCALATION_L3), any()))
                 .thenReturn(false);
             when(ticketRepository.findById(100L)).thenReturn(Optional.of(testTicket));
             when(userRepository.findByRoleAndIsActiveTrue(Role.SUPPORT_MANAGER)).thenReturn(List.of(manager1));

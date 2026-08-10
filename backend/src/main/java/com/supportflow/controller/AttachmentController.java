@@ -4,6 +4,7 @@ import com.supportflow.dto.AttachmentDTO;
 import com.supportflow.entity.User;
 import com.supportflow.entity.enums.Role;
 import com.supportflow.repository.UserRepository;
+import com.supportflow.security.AuthorizationHelper;
 import com.supportflow.service.UserIdentityService;
 import com.supportflow.service.AttachmentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +15,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -31,11 +33,13 @@ public class AttachmentController {
     private final AttachmentService attachmentService;
     private final UserRepository userRepository;
     private final UserIdentityService userIdentityService;
+    private final AuthorizationHelper authorizationHelper;
 
     @GetMapping("/tickets/{ticketId}/attachments")
     @Operation(summary = "Lister les pieces jointes d'un ticket")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<AttachmentDTO>> listByTicket(@PathVariable Long ticketId) {
+    public ResponseEntity<List<AttachmentDTO>> listByTicket(@PathVariable Long ticketId, @AuthenticationPrincipal Jwt jwt) {
+        requireTicketAccess(jwt, ticketId);
         return ResponseEntity.ok(attachmentService.listByTicket(ticketId));
     }
 
@@ -47,6 +51,7 @@ public class AttachmentController {
         @RequestPart("file") MultipartFile file,
         @RequestPart(value = "description", required = false) String description,
         @AuthenticationPrincipal Jwt jwt) {
+        requireTicketAccess(jwt, ticketId);
         Long userId = getUserIdFromJwt(jwt);
         return ResponseEntity.ok(attachmentService.uploadToTicket(ticketId, file, description, userId));
     }
@@ -54,8 +59,9 @@ public class AttachmentController {
     @GetMapping("/attachments/{id}/download")
     @Operation(summary = "Telecharger une piece jointe")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id) {
+    public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
         AttachmentDTO dto = attachmentService.getAttachment(id);
+        requireTicketAccess(jwt, dto.getTicketId());
         Resource resource = attachmentService.getAttachmentResource(id);
         String filename = dto.getOriginalName() != null ? dto.getOriginalName() : dto.getFileName();
 
@@ -68,9 +74,19 @@ public class AttachmentController {
     @DeleteMapping("/attachments/{id}")
     @Operation(summary = "Supprimer une piece jointe")
     @PreAuthorize("hasAnyRole('ADMIN','SUPPORT_MANAGER','SUPPORT_AGENT')")
-    public ResponseEntity<Map<String, String>> deleteAttachment(@PathVariable Long id) {
+    public ResponseEntity<Map<String, String>> deleteAttachment(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        AttachmentDTO dto = attachmentService.getAttachment(id);
+        if (!authorizationHelper.canStaffAccessTicket(jwt, dto.getTicketId())) {
+            throw new AccessDeniedException("Acces refuse a cette piece jointe");
+        }
         attachmentService.deleteAttachment(id);
         return ResponseEntity.ok(Map.of("message", "Attachment supprime"));
+    }
+
+    private void requireTicketAccess(Jwt jwt, Long ticketId) {
+        if (!authorizationHelper.canAccessTicket(jwt, ticketId)) {
+            throw new AccessDeniedException("Acces refuse a ce ticket");
+        }
     }
 
     private Long getUserIdFromJwt(Jwt jwt) {

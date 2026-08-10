@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supportflow-mysql-init
+  namespace: supportflow
+data:
+  01-databases.sql: |
+    CREATE DATABASE IF NOT EXISTS keycloak CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS supportflow_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    GRANT ALL PRIVILEGES ON keycloak.* TO 'supportflow'@'%';
+    GRANT ALL PRIVILEGES ON supportflow_db.* TO 'supportflow'@'%';
+    FLUSH PRIVILEGES;

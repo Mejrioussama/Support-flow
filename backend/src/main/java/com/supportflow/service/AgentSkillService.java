@@ -12,9 +12,11 @@ import com.supportflow.exception.ResourceNotFoundException;
 import com.supportflow.mapper.EntityMapper;
 import com.supportflow.repository.AgentSkillRepository;
 import com.supportflow.repository.UserRepository;
-import jakarta.annotation.PostConstruct;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +30,8 @@ public class AgentSkillService {
     private final SupportCategoryService supportCategoryService;
     private final EntityMapper mapper;
 
-    @PostConstruct
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
     public void backfillSupportUsers() {
         userRepository.findAssignableSupportUsers().forEach(this::ensureDefaultSkillsForSupportUser);
     }

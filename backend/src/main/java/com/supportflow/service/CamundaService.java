@@ -57,8 +57,9 @@ public class CamundaService {
     public String startTicketProcess(Ticket ticket) {
         log.info("Démarrage du processus Camunda pour le ticket: {}", ticket.getReference());
 
+        String businessKey = workflowBusinessKey(ticket);
         ProcessInstance existingInstance = runtimeService.createProcessInstanceQuery()
-            .processInstanceBusinessKey(ticket.getReference())
+            .processInstanceBusinessKey(businessKey)
             .active()
             .orderByProcessInstanceId()
             .desc()
@@ -95,7 +96,7 @@ public class CamundaService {
         try {
             ProcessInstance processInstance = runtimeService.startProcessInstanceByKey(
                 PROCESS_KEY, 
-                ticket.getReference(), 
+                businessKey,
                 variables
             );
             
@@ -171,6 +172,85 @@ public class CamundaService {
         } catch (Exception e) {
             log.error("Erreur lors de la complétion de la tâche de résolution", e);
         }
+    }
+
+    /** Strict queue variant: returns false when the assignment task is not available and propagates engine errors. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean completeAssignmentTaskStrict(Ticket ticket) {
+        if (ticket.getProcessInstanceId() == null || ticket.getAssignedAgent() == null) {
+            return false;
+        }
+        Task task = taskService.createTaskQuery()
+            .processInstanceId(ticket.getProcessInstanceId())
+            .taskDefinitionKey("qualify_ticket")
+            .orderByTaskCreateTime()
+            .desc()
+            .listPage(0, 1)
+            .stream()
+            .findFirst()
+            .orElse(null);
+        if (task == null) {
+            return hasAdvancedBeyond(ticket.getProcessInstanceId(), Set.of("resolve_ticket", "client_validation"));
+        }
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("assignedAgentId", String.valueOf(ticket.getAssignedAgent().getId()));
+        variables.put("assignedAgentName", ticket.getAssignedAgent().getFullName());
+        taskService.complete(task.getId(), variables);
+        return true;
+    }
+
+    /** Strict queue variant: returns false when the resolution task is not available and propagates engine errors. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean completeResolutionTaskStrict(Ticket ticket) {
+        if (ticket.getProcessInstanceId() == null) {
+            return false;
+        }
+        Task task = taskService.createTaskQuery()
+            .processInstanceId(ticket.getProcessInstanceId())
+            .taskDefinitionKey("resolve_ticket")
+            .orderByTaskCreateTime()
+            .desc()
+            .listPage(0, 1)
+            .stream()
+            .findFirst()
+            .orElse(null);
+        if (task == null) {
+            return hasAdvancedBeyond(ticket.getProcessInstanceId(), Set.of("client_validation"));
+        }
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("resolutionSummary", ticket.getResolutionSummary());
+        variables.put("resolutionTimeMinutes", ticket.getResolutionTimeMinutes());
+        variables.put("slaBreached", ticket.getSlaBreached());
+        taskService.complete(task.getId(), variables);
+        return true;
+    }
+
+    private boolean hasAdvancedBeyond(String processInstanceId, Set<String> laterTaskKeys) {
+        Task currentTask = taskService.createTaskQuery()
+            .processInstanceId(processInstanceId)
+            .orderByTaskCreateTime()
+            .desc()
+            .listPage(0, 1)
+            .stream()
+            .findFirst()
+            .orElse(null);
+        if (currentTask != null) {
+            return laterTaskKeys.contains(currentTask.getTaskDefinitionKey());
+        }
+        return runtimeService.createProcessInstanceQuery()
+            .processInstanceId(processInstanceId)
+            .active()
+            .count() == 0;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean completeValidationTaskStrict(Ticket ticket, boolean validated) {
+        if (completeValidationTask(ticket, validated)) {
+            return true;
+        }
+        Set<String> laterTasks = validated ? Set.of() : Set.of("resolve_ticket");
+        return ticket.getProcessInstanceId() != null
+            && hasAdvancedBeyond(ticket.getProcessInstanceId(), laterTasks);
     }
     
     /**
@@ -272,10 +352,7 @@ public class CamundaService {
 
         result.put("ticketReference", ticket.getReference());
 
-        List<ProcessInstance> activeInstances = runtimeService.createProcessInstanceQuery()
-            .processInstanceBusinessKey(ticket.getReference())
-            .active()
-            .list();
+        List<ProcessInstance> activeInstances = findActiveInstances(ticket);
 
         if (activeInstances == null || activeInstances.isEmpty()) {
             result.put("status", "NO_ACTIVE_INSTANCE");
@@ -379,10 +456,7 @@ public class CamundaService {
             }
         }
 
-        long remaining = runtimeService.createProcessInstanceQuery()
-            .processInstanceBusinessKey(ticket.getReference())
-            .active()
-            .count();
+        long remaining = findActiveInstances(ticket).size();
 
         result.put("status", remaining == 0 ? "COMPLETED" : "STILL_ACTIVE");
         result.put("completed", remaining == 0);
@@ -410,20 +484,30 @@ public class CamundaService {
         for (ProcessInstance instance : activeInstances) {
             scanned++;
             String businessKey = instance.getBusinessKey();
-            if (businessKey == null || businessKey.isBlank()) {
+            String ticketReference = null;
+            try {
+                Object referenceVariable = runtimeService.getVariable(instance.getId(), "ticketReference");
+                ticketReference = referenceVariable != null ? referenceVariable.toString() : null;
+            } catch (Exception ignored) {
+                // Legacy instances may not expose the variable anymore.
+            }
+            if ((ticketReference == null || ticketReference.isBlank()) && businessKey != null) {
+                ticketReference = businessKey.split("::", 2)[0];
+            }
+            if (ticketReference == null || ticketReference.isBlank()) {
                 skippedRefs.add(instance.getId() + ":NO_BUSINESS_KEY");
                 continue;
             }
 
-            Ticket ticket = ticketRepository.findByReference(businessKey).orElse(null);
+            Ticket ticket = ticketRepository.findByReference(ticketReference).orElse(null);
             if (ticket == null || ticket.getStatus() != TicketStatus.CLOSED) {
-                skippedRefs.add(businessKey + ":NOT_CLOSED");
+                skippedRefs.add(ticketReference + ":NOT_CLOSED");
                 continue;
             }
 
             runtimeService.deleteProcessInstance(instance.getId(), "Cleanup closed ticket stale active instance");
             deleted++;
-            deletedRefs.add(businessKey + ":" + instance.getId());
+            deletedRefs.add(ticketReference + ":" + instance.getId());
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -632,6 +716,23 @@ public class CamundaService {
                 .singleResult();
             
             if (instance == null) {
+                HistoricProcessInstance historicInstance = historyService.createHistoricProcessInstanceQuery()
+                    .processInstanceId(processInstanceId)
+                    .singleResult();
+                if (historicInstance != null) {
+                    return ProcessStatusDTO.builder()
+                        .processInstanceId(processInstanceId)
+                        .currentActivity("COMPLETED")
+                        .processStatus("COMPLETED")
+                        .startTime(historicInstance.getStartTime() != null
+                            ? LocalDateTime.ofInstant(historicInstance.getStartTime().toInstant(), ZoneId.systemDefault())
+                            : null)
+                        .endTime(historicInstance.getEndTime() != null
+                            ? LocalDateTime.ofInstant(historicInstance.getEndTime().toInstant(), ZoneId.systemDefault())
+                            : null)
+                        .complete(true)
+                        .build();
+                }
                 return ProcessStatusDTO.builder().processStatus("NOT_FOUND").build();
             }
             
@@ -671,8 +772,18 @@ public class CamundaService {
         }
         
         try {
+            Ticket ticket = ticketRepository.findByReference(ticketReference).orElse(null);
+            if (ticket != null && ticket.getProcessInstanceId() != null
+                    && !ticket.getProcessInstanceId().isBlank()) {
+                ProcessStatusDTO persistedStatus = getProcessStatus(ticket.getProcessInstanceId());
+                if (!"NOT_FOUND".equals(persistedStatus.getProcessStatus())) {
+                    return persistedStatus;
+                }
+            }
+
+            String businessKey = ticket != null ? workflowBusinessKey(ticket) : ticketReference;
             ProcessInstance instance = runtimeService.createProcessInstanceQuery()
-                .processInstanceBusinessKey(ticketReference)
+                .processInstanceBusinessKey(businessKey)
                 .active()
                 .orderByProcessInstanceId()
                 .desc()
@@ -683,7 +794,7 @@ public class CamundaService {
             
             if (instance == null) {
                 HistoricProcessInstance historicInstance = historyService.createHistoricProcessInstanceQuery()
-                    .processInstanceBusinessKey(ticketReference)
+                    .processInstanceBusinessKey(businessKey)
                     .orderByProcessInstanceStartTime()
                     .desc()
                     .listPage(0, 1)
@@ -799,5 +910,23 @@ public class CamundaService {
             .currentActivity(status.getCurrentActivity())
             .steps(steps)
             .build();
+    }
+
+    private String workflowBusinessKey(Ticket ticket) {
+        String createdAt = ticket.getCreatedAt() != null ? ticket.getCreatedAt().toString() : "unknown";
+        return ticket.getReference() + "::" + ticket.getId() + "::" + createdAt;
+    }
+
+    private List<ProcessInstance> findActiveInstances(Ticket ticket) {
+        if (ticket.getProcessInstanceId() != null && !ticket.getProcessInstanceId().isBlank()) {
+            return runtimeService.createProcessInstanceQuery()
+                .processInstanceId(ticket.getProcessInstanceId())
+                .active()
+                .list();
+        }
+        return runtimeService.createProcessInstanceQuery()
+            .processInstanceBusinessKey(workflowBusinessKey(ticket))
+            .active()
+            .list();
     }
 }

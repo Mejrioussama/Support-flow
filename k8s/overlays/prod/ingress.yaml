@@ -6,6 +6,11 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: public
 spec:
+  ingressClassName: public
+  tls:
+    - hosts:
+        - supportflow.example.com
+      secretName: supportflow-tls
   rules:
     - host: supportflow.example.com
       http:

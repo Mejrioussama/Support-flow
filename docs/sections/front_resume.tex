@@ -1,0 +1,12 @@
+\chapter*{Resume}
+\addcontentsline{toc}{chapter}{Resume}
+
+Ce rapport presente le travail realise dans le cadre d'un stage de fin d'etudes consacre a la conception et a la consolidation de \textbf{SupportFlow}, une plateforme intelligente de gestion des tickets support. Le projet vise a repondre aux difficultes classiques rencontrees dans de nombreuses organisations : dispersion des demandes, manque de tracabilite, delais de traitement mal maitrises, visibilite insuffisante pour les managers, et faible capitalisation des solutions deja produites.
+
+L'objectif principal etait de construire une application metier complete, capable d'orchestrer le cycle de vie d'un ticket depuis sa creation jusqu'a sa cloture et son archivage, tout en integrant des dimensions avancees telles que la gestion des habilitations, le suivi SLA, l'escalade, les notifications temps reel, l'archivage documentaire, le reporting et l'assistance intelligente.
+
+La solution retenue repose sur une architecture full stack composee d'un frontend Angular, d'un backend Spring Boot, de Camunda pour le pilotage BPMN, de Keycloak pour l'authentification et l'autorisation, d'Alfresco pour la GED, ainsi que d'un agent IA base sur FastAPI et Ollama pour l'analyse et la suggestion. Le deploiement local et de demonstration est pris en charge par Docker Compose, tandis que la chaine GitOps s'appuie sur GitHub Actions, GHCR, Kubernetes, ArgoCD et SonarQube.
+
+Au-dela de la simple realisation technique, le stage a permis de traiter des sujets transverses essentiels : clarification des roles client, agent et manager, securisation fine des actions sensibles, robustesse des scenarios de demonstration, reprise des workflows Camunda, validation des integrations, amelioration des temps de reponse et preparation d'une soutenance techniquement defendable.
+
+Le rapport met en lumiere la problematique, la mission confiee, la demarche adoptee, les choix architecturaux, les resultats obtenus, les difficultes rencontrees ainsi que les perspectives d'evolution. Il montre que SupportFlow depasse le cadre d'une application CRUD et se positionne comme un veritable systeme metier de support, demonstrable, maintenable et evolutif.

@@ -1,0 +1,48 @@
+﻿\chapter{Etude de l'existant et problematique}
+
+\section{Contexte}
+
+Dans une entreprise de services numeriques, de nombreuses demandes de support sont formulees chaque jour par des utilisateurs internes ou des clients externes. Ces demandes concernent des incidents de production, des anomalies applicatives, des demandes de correction, des demandes d'acces, des questions fonctionnelles ou des demandes de changements. Lorsque ce flux n'est pas structure, plusieurs difficultes apparaissent rapidement. Le support ne sait plus prioriser correctement, les utilisateurs ne savent pas ou en est leur dossier, les responsables n'ont pas de vision fiable des delais, et il devient presque impossible de capitaliser les solutions deja apportees.
+
+Le projet SupportFlow s'inscrit dans ce contexte. Il cherche a proposer une solution complete de gestion des tickets, capable d'encadrer le cycle de vie d'une demande de support de maniere claire, tracable et mesurable. La presence d'un moteur BPMN, d'une GED et d'une couche IA montre que l'ambition du projet depasse la simple gestion d'un tableau de tickets. L'application se rapproche d'un systeme de support d'entreprise qui pourrait servir de base a un produit plus large.
+
+\section{Problematique}
+
+La problematique centrale peut etre formulee ainsi : comment concevoir une plateforme qui structure efficacement le traitement des tickets de support, garantisse la securite des acces, automatise les etapes critiques, surveille les engagements SLA et offre une experience claire a la fois aux agents, aux managers et aux clients ?
+
+Cette problematique peut etre decomposee en plusieurs questions :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Comment representer le cycle de vie d'un ticket de facon explicite et evolutive ?
+  \item Comment assurer un controle d'acces coherent entre interface utilisateur, API backend et workflow ?
+  \item Comment detecter les tickets a risque avant le depassement d'un SLA ?
+  \item Comment faciliter l'assignation et la reassignation des tickets en tenant compte des competences et de la charge ?
+  \item Comment conserver un historique fiable des actions et des decisions prises ?
+  \item Comment enrichir le traitement du support avec des fonctions d'aide a la decision basees sur l'IA ?
+\end{itemize}
+
+\section{Justification du projet}
+
+Le choix de realiser un projet comme SupportFlow est pertinent pour plusieurs raisons. D'un point de vue pedagogique, il mobilise des competences variees : backend Java, frontend Angular, securite OAuth2, modelisation BPMN, gestion documentaire, WebSocket, conteneurisation et integration d'un composant IA. D'un point de vue metier, il met en scene un probleme concret et recurrent dans les entreprises. D'un point de vue technique, il offre l'opportunite de travailler sur les sujets difficiles qui distinguent une application serieuse d'une simple maquette : autorisations, workflow, performance percue, reprise apres incident, seed de donnees, supervision et experience utilisateur.
+
+\section{Objectifs generaux}
+
+L'objectif principal de SupportFlow est de construire un socle fonctionnel permettant de gerer un ticket du debut a la fin, avec une separation claire des responsabilites. Cela suppose de fournir :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item une interface de creation et de consultation de tickets ;
+  \item un moteur d'assignation et de prise en charge ;
+  \item un suivi de statut et un historique d'actions ;
+  \item une supervision des SLA et des alertes ;
+  \item un systeme d'escalade ;
+  \item un espace de validation client ;
+  \item des fonctions d'archivage et de reporting ;
+  \item un environnement de demonstration complet sous Docker ;
+  \item un assistant IA pour accelerer certaines taches du support.
+\end{itemize}
+
+\section{Resultat attendu}
+
+Le resultat attendu n'est pas seulement une application qui fonctionne en local, mais un demonstrateur convaincant d'un produit support metier. En pratique, cela signifie que l'utilisateur doit percevoir un systeme coherent, dans lequel les boutons visibles correspondent a de vraies permissions, les statuts ont un sens metier clair, les workflows Camunda representent un comportement observable, et les donnees de test permettent de simuler des cas reels.
+
+

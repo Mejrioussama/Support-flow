@@ -31,25 +31,40 @@ export const authTokenInterceptor: HttpInterceptorFn = (req, next) => {
 
   const keycloak = inject(KeycloakService);
 
-  return from(Promise.resolve(keycloak.isLoggedIn())).pipe(
-    switchMap((isLoggedIn) => {
-      if (!isLoggedIn) {
+  return from(
+    (async () => {
+      const keycloakInstance = keycloak.getKeycloakInstance();
+
+      try {
+        await keycloak.updateToken(30).catch(() => false);
+      } catch {
+        // Ignore token refresh failures and fall back to the last known token.
+      }
+
+      try {
+        const token = await keycloak.getToken();
+        const tokenExpired = !token || keycloakInstance?.isTokenExpired?.(5);
+        if (tokenExpired) {
+          void keycloak.login({ redirectUri: window.location.href }).catch(() => undefined);
+          return '';
+        }
+        return token;
+      } catch {
+        void keycloak.login({ redirectUri: window.location.href }).catch(() => undefined);
+        return '';
+      }
+    })()
+  ).pipe(
+    switchMap((token) => {
+      if (!token) {
         return next(req);
       }
 
-      return from(keycloak.getToken()).pipe(
-        switchMap((token) => {
-          if (!token) {
-            return next(req);
+      return next(
+        req.clone({
+          setHeaders: {
+            Authorization: `Bearer ${token}`
           }
-
-          return next(
-            req.clone({
-              setHeaders: {
-                Authorization: `Bearer ${token}`
-              }
-            })
-          );
         })
       );
     })

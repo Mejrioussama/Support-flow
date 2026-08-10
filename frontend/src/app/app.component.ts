@@ -55,6 +55,13 @@ import { WebSocketService, NotificationService } from '@core/services';
             [collapsed]="sidebarCollapsed"
             (toggleSidebar)="sidebarCollapsed = !sidebarCollapsed">
           </app-header>
+
+          @if (backendUnavailable) {
+            <div class="backend-warning" role="status">
+              <mat-icon>cloud_off</mat-icon>
+              <span>Le backend SupportFlow est temporairement indisponible. La reconnexion continue en arriere-plan.</span>
+            </div>
+          }
           
           <main class="content-area">
             <router-outlet></router-outlet>
@@ -121,6 +128,20 @@ import { WebSocketService, NotificationService } from '@core/services';
       opacity: 0.3;
       animation: floatAppBg 25s infinite alternate ease-in-out;
       transform-style: preserve-3d;
+    }
+
+    .backend-warning {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 12px 24px 0;
+      padding: 12px 16px;
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      border-radius: 12px;
+      background: rgba(120, 53, 15, 0.88);
+      color: #fef3c7;
     }
 
     .sphere-1 {
@@ -345,9 +366,11 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   isLoggedIn = false;
   sidebarCollapsed = false;
   initialized = false;
+  backendUnavailable = false;
   safeVisualMode = false;
   private router = inject(Router);
   private toastSub: Subscription | null = null;
+  private backendReadySub: Subscription | null = null;
 
   @ViewChild('loaderCanvas') loaderCanvasRef!: ElementRef;
   @ViewChild('loginCanvas') loginCanvasRef!: ElementRef;
@@ -362,6 +385,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   private themeObserver: MutationObserver | null = null;
   private mouseX = 0;
   private mouseY = 0;
+  private readonly mouseMoveHandler = (event: MouseEvent) => this.onMouseMove(event);
 
   constructor(
     private keycloak: KeycloakService,
@@ -370,7 +394,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     private snackBar: MatSnackBar
   ) {
     if (typeof window !== 'undefined') {
-      window.addEventListener('mousemove', this.onMouseMove.bind(this));
+      window.addEventListener('mousemove', this.mouseMoveHandler);
       this.setupThemeObserver();
     }
   }
@@ -418,6 +442,9 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (this.isLoggedIn) {
       this.wsService.connect();
+      this.backendReadySub = this.wsService.isBackendReady().subscribe(ready => {
+        this.backendUnavailable = ready === false;
+      });
       this.notificationService.init();
 
       this.toastSub = this.notificationService.getToastMessages().subscribe(toast => {
@@ -452,9 +479,10 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy(): void {
     this.toastSub?.unsubscribe();
+    this.backendReadySub?.unsubscribe();
     this.wsService.disconnect();
     if (typeof window !== 'undefined') {
-      window.removeEventListener('mousemove', this.onMouseMove.bind(this));
+      window.removeEventListener('mousemove', this.mouseMoveHandler);
       this.themeObserver?.disconnect();
     }
     if (this.animationFrameId !== null) {

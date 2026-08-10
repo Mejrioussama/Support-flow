@@ -249,12 +249,19 @@ public class Ticket extends BaseEntity {
     @Builder.Default
     private Set<Attachment> attachments = new HashSet<>();
     
-    @OneToMany(mappedBy = "ticket", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    // No cascade/orphanRemoval here (unlike comments/attachments above): history and
+    // notifications are the ticket's audit trail, which must survive independently of the
+    // parent Ticket row's lifecycle. With cascade=ALL, deleting a Ticket silently erased its
+    // entire audit trail; without it, the DB's FK constraint (ticket_history.ticket_id /
+    // notifications.ticket_id -> tickets.id, no ON DELETE CASCADE) blocks hard-deleting a
+    // ticket that still has history - see TicketService.deleteTicket(), which turns that into
+    // a clear error rather than deleting audit records.
+    @OneToMany(mappedBy = "ticket", fetch = FetchType.LAZY)
     @OrderBy("createdAt DESC")
     @Builder.Default
     private List<TicketHistory> history = new ArrayList<>();
-    
-    @OneToMany(mappedBy = "ticket", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+
+    @OneToMany(mappedBy = "ticket", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Notification> notifications = new ArrayList<>();
     
@@ -284,6 +291,14 @@ public class Ticket extends BaseEntity {
         }
         
         long totalMinutes = java.time.Duration.between(getCreatedAt(), slaDeadline).toMinutes();
+        if (totalMinutes <= 0) {
+            // Zero-or-negative-length SLA window (e.g. slaDeadline == createdAt): the division
+            // below would be 0/0 = NaN, and every "< x" comparison against NaN is false, so this
+            // silently fell through to the lowest urgency factor (0) - the opposite of correct
+            // for a ticket whose SLA window is already exhausted. Treat it as maximally urgent,
+            // consistent with the now.isAfter(slaDeadline) branch above.
+            return 4;
+        }
         long remainingMinutes = java.time.Duration.between(now, slaDeadline).toMinutes();
         double percentageRemaining = (double) remainingMinutes / totalMinutes;
         

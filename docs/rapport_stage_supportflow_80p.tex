@@ -1,0 +1,121 @@
+\documentclass[12pt,a4paper,oneside]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{mathptmx}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage{xurl}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{multirow}
+\usepackage{colortbl}
+\usepackage{etoolbox}
+\usepackage{seqsplit}
+
+\setstretch{1.80}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{2em}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!45!black,
+  urlcolor=blue!45!black,
+  pdftitle={Rapport de stage SupportFlow},
+  pdfauthor={SupportFlow}
+}
+
+\definecolor{sfblue}{RGB}{17,61,126}
+\definecolor{sflight}{RGB}{236,242,250}
+
+\titleformat{\chapter}{\Huge\bfseries\color{sfblue}}{\thechapter}{1em}{}
+\titleformat{\section}{\Large\bfseries\color{sfblue}}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries\color{sfblue}}{\thesubsection}{0.7em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{SupportFlow}
+\rhead{\leftmark}
+\cfoot{\thepage}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\code}[1]{{\ttfamily\seqsplit{#1}}}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+  backgroundcolor=\color{sflight}
+}
+
+\input{report-metadata}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  {\scshape\Large \Etablissement \par}
+  \vspace{0.8cm}
+  {\large \Specialite \par}
+  \vspace{1.8cm}
+  {\Huge\bfseries Rapport de stage de fin d'etudes \par}
+  \vspace{0.6cm}
+  {\LARGE\bfseries SupportFlow \par}
+  \vspace{0.4cm}
+  {\Large Plateforme intelligente de gestion, d'orchestration et de supervision des tickets support \par}
+  \vspace{1.8cm}
+  \begin{tabular}{ll}
+    Etudiant(e) : & \NomEtudiant \\
+    Entreprise d'accueil : & \EntrepriseAccueil \\
+    Encadrant academique : & \EncadrantAcademique \\
+    Encadrant entreprise : & \EncadrantEntreprise \\
+    Periode du stage : & \PeriodeStage \\
+    Annee universitaire : & \AnneeUniversitaire \\
+  \end{tabular}
+  \vfill
+  {\large Document academique redige en LaTeX a partir du projet reel, de sa documentation, de son code source et de l'etat final de l'application. \par}
+\end{titlepage}
+
+\pagenumbering{roman}
+
+\input{sections/front_remerciements}
+\input{sections/front_resume}
+\input{sections/front_abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\input{sections/front_glossaire}
+
+\clearpage
+\pagenumbering{arabic}
+
+\input{sections/ch01_introduction_generale}
+\input{sections/ch02_entreprise_cadre_stage}
+\input{sections/ch03_etude_existant_problematique}
+\input{sections/ch04_analyse_besoins}
+\input{sections/ch05_methodologie_conduite_projet}
+\input{sections/ch06_conception_generale_solution}
+\input{sections/ch07_realisation_technique}
+\input{sections/ch08_tests_validation_resultats}
+\input{sections/ch09_analyse_critique_apports_perspectives}
+\input{sections/ch10_conclusion_generale}
+\input{sections/bibliographie}
+
+\appendix
+\input{sections/annexes/annexes_supportflow}
+
+\end{document}

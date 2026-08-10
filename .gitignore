@@ -43,6 +43,7 @@ welcome2-headers.txt
 .env
 .env.local
 *.secret
+k8s/base/app-secrets.yaml
 token.txt
 admin-token.txt
 manager-token.txt

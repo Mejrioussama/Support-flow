@@ -14,14 +14,18 @@ import com.supportflow.entity.TicketHistory;
 import com.supportflow.entity.User;
 import com.supportflow.entity.enums.Priority;
 import com.supportflow.entity.enums.Severity;
+import com.supportflow.entity.enums.TicketHistoryAction;
 import com.supportflow.entity.enums.TicketStatus;
 import com.supportflow.entity.enums.WaitingOn;
+import com.supportflow.entity.enums.WorkflowSyncAction;
 import com.supportflow.exception.ArchiveIntegrationException;
 import com.supportflow.exception.BusinessException;
 import com.supportflow.exception.ResourceNotFoundException;
 import com.supportflow.mapper.EntityMapper;
+import com.supportflow.entity.TicketReferenceSequence;
 import com.supportflow.repository.ClientRepository;
 import com.supportflow.repository.TicketHistoryRepository;
+import com.supportflow.repository.TicketReferenceSequenceRepository;
 import com.supportflow.repository.TicketRepository;
 import com.supportflow.repository.UserRepository;
 import java.time.LocalDate;
@@ -40,7 +44,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,8 +55,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Service
 @Transactional
-public class TicketService {
+public class TicketService implements TicketLifecycleOperations {
    private static final Logger log = LoggerFactory.getLogger(TicketService.class);
+   // Bound on how many candidate rows the unassigned-queue / workbench-bucket queries load before
+   // sorting/truncating to the caller's requested limit. Prevents an unbounded full-table load as
+   // the backlog grows; ordering (SLA-breached first, oldest first) keeps the most relevant rows
+   // inside this window even when the true backlog exceeds it.
+   private static final int TICKET_QUERY_CANDIDATE_POOL_SIZE = 200;
    private final TicketRepository ticketRepository;
    private final ClientRepository clientRepository;
    private final UserRepository userRepository;
@@ -61,8 +72,7 @@ public class TicketService {
    private final KeycloakAdminService keycloakAdminService;
    private final ReportService reportService;
    private final SlaComputationService slaComputationService;
-   @Autowired(required = false)
-   private BusinessHoursService businessHoursService;
+   private final WorkflowSynchronization workflowSyncService;
    @Autowired(
       required = false
    )
@@ -71,21 +81,16 @@ public class TicketService {
    private EscalationService escalationService;
    @Autowired
    private SupportCategoryService supportCategoryService;
+   @Autowired
+   private TicketReferenceSequenceRepository ticketReferenceSequenceRepository;
    @Autowired(required = false)
    private AlfrescoCmisService alfrescoCmisService;
-   @Value("${supportflow.sla.super-critical-minutes:2}")
-   private int slaSuperCriticalMinutes;
-   @Value("${supportflow.sla.critical-hours:4}")
-   private int slaCriticalHours;
-   @Value("${supportflow.sla.high-hours:8}")
-   private int slaHighHours;
-   @Value("${supportflow.sla.medium-hours:24}")
-   private int slaMediumHours;
-   @Value("${supportflow.sla.low-hours:72}")
-   private int slaLowHours;
+
+   @Value("${supportflow.workflow.camunda-enabled:true}")
+   private boolean camundaEnabled;
 
    @Autowired
-   public TicketService(TicketRepository ticketRepository, ClientRepository clientRepository, UserRepository userRepository, TicketHistoryRepository historyRepository, EntityMapper mapper, NotificationService notificationService, CamundaAsyncService camundaAsyncService, KeycloakAdminService keycloakAdminService, ReportService reportService, SlaComputationService slaComputationService) {
+   public TicketService(TicketRepository ticketRepository, ClientRepository clientRepository, UserRepository userRepository, TicketHistoryRepository historyRepository, EntityMapper mapper, NotificationService notificationService, CamundaAsyncService camundaAsyncService, KeycloakAdminService keycloakAdminService, ReportService reportService, SlaComputationService slaComputationService, WorkflowSynchronization workflowSyncService) {
       this.ticketRepository = ticketRepository;
       this.clientRepository = clientRepository;
       this.userRepository = userRepository;
@@ -96,6 +101,7 @@ public class TicketService {
       this.keycloakAdminService = keycloakAdminService;
       this.reportService = reportService;
       this.slaComputationService = slaComputationService;
+      this.workflowSyncService = workflowSyncService;
    }
 
    public TicketResponseDTO createTicket(TicketCreateDTO dto, Long userId) {
@@ -118,17 +124,7 @@ public class TicketService {
          ticket = (Ticket)this.ticketRepository.save(ticket);
          TicketHistory history = TicketHistory.createCreation(ticket, creator);
          this.historyRepository.save(history);
-         if (false && this.camundaService != null) {
-            try {
-               String processInstanceId = this.camundaService.startTicketProcess(ticket);
-               ticket.setProcessInstanceId(processInstanceId);
-               ticket = (Ticket)this.ticketRepository.save(ticket);
-            } catch (Exception e) {
-               log.warn("Impossible de dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©marrer le processus Camunda: {}", e.getMessage());
-               this.recordCamundaSyncIssue(ticket, "CREATE", e.getMessage());
-            }
-         }
-
+         this.enqueueWorkflowSync(ticket, WorkflowSyncAction.START, null, "CREATE");
          this.scheduleTicketCreationSideEffects(ticket.getId());
          log.info("Ticket crÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© avec succÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨s: {}", ticket.getReference());
          return this.mapper.toTicketResponseDTO(ticket);
@@ -253,7 +249,7 @@ public class TicketService {
          this.notificationService.notifyTicketAssigned(ticket, agent);
          if (this.camundaService != null) {
             try {
-               this.completeAssignmentTaskWhenReady(ticket, "ASSIGN");
+               this.enqueueWorkflowSync(ticket, WorkflowSyncAction.ASSIGN, null, ticket.getAssignedAt().toString());
             } catch (Exception e) {
                log.warn("Impossible de complÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ter la tÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢che Camunda: {}", e.getMessage());
                this.recordCamundaSyncIssue(ticket, "ASSIGN", e.getMessage());
@@ -481,11 +477,23 @@ public class TicketService {
       readOnly = true
    )
    public List<TicketResponseDTO> getUnassignedTickets() {
-      return this.mapper.toTicketResponseDTOList(this.ticketRepository.findUnassignedTickets());
+      Pageable bounded = PageRequest.of(0, TICKET_QUERY_CANDIDATE_POOL_SIZE);
+      return this.mapper.toTicketResponseDTOList(this.ticketRepository.findUnassignedTickets(bounded));
    }
 
    public void deleteTicket(Long id) {
       Ticket ticket = (Ticket)this.ticketRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ticket non trouve: " + id));
+      // history/notifications no longer cascade-delete with the ticket (audit trail must
+      // survive independently - see Ticket.history/notifications). Every ticket created through
+      // the normal flow has at least a CREATED history entry, so hard-deleting a real ticket
+      // would otherwise fail on the DB's FK constraint with an opaque 500; fail clearly instead
+      // and point at the intended path (CANCELLED status) for retiring a ticket without erasing
+      // its history.
+      if (this.historyRepository.countByTicketId(id) > 0) {
+         throw new BusinessException(
+            "Impossible de supprimer le ticket " + ticket.getReference()
+               + ": son historique doit etre conserve. Utilisez le statut CANCELLED pour le retirer.");
+      }
       if (this.camundaService != null && ticket.getProcessInstanceId() != null) {
          try {
             this.camundaService.cancelProcess(ticket.getProcessInstanceId(), "Ticket supprime");
@@ -545,23 +553,33 @@ public class TicketService {
       }
    }
 
-   private String generateReference() {
-      Integer maxNumber = this.ticketRepository.findMaxReferenceNumber();
-      int nextNumber = (maxNumber != null ? maxNumber : 0) + 1;
-      return String.format("SF-%04d", nextNumber);
+   private TicketHistoryAction resolveWaitingOnAction(WaitingOn waitingOn) {
+      if (waitingOn == null) {
+         return TicketHistoryAction.WAITING_ON_CLIENT;
+      }
+      return switch (waitingOn) {
+         case CLIENT -> TicketHistoryAction.WAITING_ON_CLIENT;
+         case AGENT -> TicketHistoryAction.WAITING_ON_AGENT;
+         case MANAGER -> TicketHistoryAction.WAITING_ON_MANAGER;
+         case THIRD_PARTY -> TicketHistoryAction.WAITING_ON_THIRD_PARTY;
+      };
    }
 
    /**
-    * Calcule la durée SLA en minutes selon la sévérité
+    * Atomically reserves and returns the next ticket reference (SF-0001, SF-0002, ...).
+    * Locks the single counter row with PESSIMISTIC_WRITE (held for the duration of the
+    * caller's transaction) instead of the previous unlocked SELECT MAX(reference)+1, which
+    * let two concurrent createTicket() calls compute the same next number and made the
+    * second one fail outright on the tickets.reference unique constraint.
     */
-   private int calculateSlaMinutes(Severity severity) {
-      return switch (severity) {
-         case SUPER_CRITICAL -> this.slaSuperCriticalMinutes;
-         case CRITICAL -> this.slaCriticalHours * 60;
-         case HIGH -> this.slaHighHours * 60;
-         case MEDIUM -> this.slaMediumHours * 60;
-         case LOW -> this.slaLowHours * 60;
-      };
+   private String generateReference() {
+      TicketReferenceSequence sequence = this.ticketReferenceSequenceRepository.lockForUpdate()
+         .orElseThrow(() -> new IllegalStateException(
+            "Sequence de reference ticket non initialisee (table ticket_reference_sequence)"));
+      int nextNumber = sequence.getLastValue() + 1;
+      sequence.setLastValue(nextNumber);
+      this.ticketReferenceSequenceRepository.save(sequence);
+      return String.format("SF-%04d", nextNumber);
    }
 
    public TicketResponseDTO takeCharge(Long ticketId, Long agentId) {
@@ -628,7 +646,7 @@ public class TicketService {
             ticket.setStatus(TicketStatus.ESCALATED_MANUAL);
             TicketHistory history = new TicketHistory();
             history.setTicket(ticket);
-            history.setAction("ESCALADE_MANUELLE");
+            history.setAction(TicketHistoryAction.ESCALADE_MANUELLE);
             history.setOldValue(oldAgent != null ? oldAgent.getUsername() : "Non assignÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©");
             String var10001 = newAgent.getUsername();
             history.setNewValue(var10001 + " - Motif: " + motif);
@@ -674,7 +692,7 @@ public class TicketService {
          TicketHistory history = new TicketHistory();
          history.setTicket(ticket);
          history.setUser(user);
-         history.setAction("MANAGER_REVIEW_REQUESTED");
+         history.setAction(TicketHistoryAction.MANAGER_REVIEW_REQUESTED);
          history.setDescription("Revue manager demandee: " + reason.trim());
          history.setPerformedBy(user != null ? user.getFullName() : "System");
          history.setCreatedAt(LocalDateTime.now());
@@ -710,7 +728,7 @@ public class TicketService {
       
       TicketHistory history = new TicketHistory();
       history.setTicket(ticket);
-      history.setAction("SLA_PAUSED_MANUAL");
+      history.setAction(TicketHistoryAction.SLA_PAUSED_MANUAL);
       history.setDescription("SLA mis en pause: " + (reason != null && !reason.isBlank() ? reason.trim() : "motif non renseigne"));
       history.setPerformedBy(user != null ? user.getUsername() : "System");
       history.setCreatedAt(LocalDateTime.now());
@@ -744,7 +762,7 @@ public class TicketService {
       
       TicketHistory history = new TicketHistory();
       history.setTicket(ticket);
-      history.setAction("SLA_RESUMED");
+      history.setAction(TicketHistoryAction.SLA_RESUMED);
       history.setDescription("SLA repris apres " + pausedMinutes + " minutes de pause. Nouvelle deadline: " + ticket.getSlaDeadline());
       history.setPerformedBy(user != null ? user.getUsername() : "System");
       history.setCreatedAt(LocalDateTime.now());
@@ -778,7 +796,7 @@ public class TicketService {
 
       TicketHistory history = new TicketHistory();
       history.setTicket(ticket);
-      history.setAction("WAITING_ON_" + ticket.getWaitingOn().name());
+      history.setAction(resolveWaitingOnAction(ticket.getWaitingOn()));
       history.setOldValue(oldStatus.name());
       history.setNewValue(TicketStatus.PENDING.name());
       history.setDescription(reason != null && !reason.isBlank()
@@ -825,7 +843,7 @@ public class TicketService {
       
       TicketHistory history = new TicketHistory();
       history.setTicket(ticket);
-      history.setAction("SLA_EXTENDED");
+      history.setAction(TicketHistoryAction.SLA_EXTENDED);
       history.setOldValue(oldDeadline != null ? oldDeadline.toString() : "N/A");
       history.setNewValue(ticket.getSlaDeadline() != null ? ticket.getSlaDeadline().toString() : "N/A");
       history.setDescription("SLA prolonge de " + additionalMinutes + " min. Raison: " + reason);
@@ -869,7 +887,7 @@ public class TicketService {
          TicketHistory detailsHistory = new TicketHistory();
          detailsHistory.setTicket(ticket);
          detailsHistory.setUser(agent);
-         detailsHistory.setAction("RESOLUTION_CAPTURED");
+         detailsHistory.setAction(TicketHistoryAction.RESOLUTION_CAPTURED);
          detailsHistory.setDescription("Resolution structuree enregistree");
          detailsHistory.setPerformedBy(agent.getFullName());
          detailsHistory.setCreatedAt(LocalDateTime.now());
@@ -879,7 +897,7 @@ public class TicketService {
          this.notificationService.broadcastTicketStatusChange(ticket, oldStatus, "RESOLVED");
          if (this.camundaService != null) {
             try {
-               this.camundaService.completeResolutionTask(ticket);
+               this.enqueueWorkflowSync(ticket, WorkflowSyncAction.RESOLVE, null, ticket.getResolvedAt().toString());
             } catch (Exception e) {
                log.warn("Impossible de complÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ter la tÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢che Camunda: {}", e.getMessage());
                this.recordCamundaSyncIssue(ticket, "RESOLVE", e.getMessage());
@@ -912,7 +930,7 @@ public class TicketService {
          ticket = (Ticket)this.ticketRepository.save(ticket);
          TicketHistory history = new TicketHistory();
          history.setTicket(ticket);
-         history.setAction("RESOLUTION_REJECTED");
+         history.setAction(TicketHistoryAction.RESOLUTION_REJECTED);
          history.setOldValue(oldStatus.name());
          history.setNewValue(TicketStatus.IN_PROGRESS.name());
          history.setDescription(rejectionComment != null && !rejectionComment.isBlank() ? "Motif rejet: " + rejectionComment.trim() : "Le client a rejete la resolution");
@@ -924,7 +942,7 @@ public class TicketService {
          this.notificationService.broadcastTicketStatusChange(ticket, oldStatus.name(), TicketStatus.IN_PROGRESS.name());
          if (this.camundaService != null) {
             try {
-               this.camundaService.completeValidationTask(ticket, false);
+               this.enqueueWorkflowSync(ticket, WorkflowSyncAction.VALIDATE, "false", history.getCreatedAt().toString());
             } catch (Exception e) {
                log.warn("Impossible de synchroniser Camunda apres rejet client: {}", e.getMessage());
                this.recordCamundaSyncIssue(ticket, "REJECT_RESOLUTION", e.getMessage());
@@ -948,7 +966,7 @@ public class TicketService {
             ticket.setSatisfactionComment(satisfactionComment);
             TicketHistory history = new TicketHistory();
             history.setTicket(ticket);
-            history.setAction("FERMETURE");
+            history.setAction(TicketHistoryAction.FERMETURE);
             history.setOldValue(TicketStatus.RESOLVED.name());
             history.setNewValue("CLOSED - Satisfaction: " + satisfactionRating + "/5");
             history.setCreatedAt(LocalDateTime.now());
@@ -957,7 +975,7 @@ public class TicketService {
 
             if (this.camundaService != null) {
                try {
-                  this.camundaAsyncService.completeValidationTaskAsync(ticket, true);
+                   this.enqueueWorkflowSync(ticket, WorkflowSyncAction.CLOSE, "true", ticket.getClosedAt().toString());
                } catch (Exception e) {
                   log.warn("Impossible de lancer la synchronisation Camunda apres fermeture du ticket {}: {}", ticket.getReference(), e.getMessage());
                   this.recordCamundaSyncIssue(ticket, "CLOSE", e.getMessage());
@@ -971,6 +989,9 @@ public class TicketService {
                log.warn("Archivage Alfresco indisponible pour {}: {}", ticket.getReference(), e.getMessage());
                this.recordArchiveSyncIssue(ticket, "CLOSE", e.getMessage());
             }
+
+            this.enqueueWorkflowSync(ticket, WorkflowSyncAction.ARCHIVE, null,
+               "CLOSE:" + ticket.getClosedAt());
 
             log.info("Ticket {} ferme avec satisfaction {}/5, archivage GED traite et synchronisation Camunda declenchee", ticket.getReference(), satisfactionRating);
             return this.mapper.toTicketResponseDTO(ticket);
@@ -992,6 +1013,7 @@ public class TicketService {
          this.recordArchiveSyncIssue(ticket, "MANUAL_ARCHIVE", e.getMessage());
       }
       ticket = (Ticket)this.ticketRepository.saveAndFlush(ticket);
+      this.enqueueWorkflowSync(ticket, WorkflowSyncAction.ARCHIVE, null, "ARCHIVE");
       return this.mapper.toTicketResponseDTO(ticket);
    }
 
@@ -1026,7 +1048,7 @@ public class TicketService {
       if (reason != null && !reason.isBlank()) {
          TicketHistory reasonHistory = new TicketHistory();
          reasonHistory.setTicket(ticket);
-         reasonHistory.setAction("STATUS_REASON");
+         reasonHistory.setAction(TicketHistoryAction.STATUS_REASON);
          reasonHistory.setFieldName("status");
          reasonHistory.setDescription("Motif changement statut: " + reason.trim());
          reasonHistory.setPerformedBy(user != null ? user.getFullName() : "System");
@@ -1064,7 +1086,7 @@ public class TicketService {
          ticket = (Ticket)this.ticketRepository.save(ticket);
          TicketHistory history = new TicketHistory();
          history.setTicket(ticket);
-         history.setAction("SLA_DUE_DATE_UPDATED");
+         history.setAction(TicketHistoryAction.SLA_DUE_DATE_UPDATED);
          history.setOldValue(oldDeadline != null ? oldDeadline.toString() : "null");
          history.setNewValue(dueDate.toString());
          history.setPerformedBy(user != null ? user.getFullName() : "System");
@@ -1086,7 +1108,7 @@ public class TicketService {
       } else {
          TicketHistory history = new TicketHistory();
          history.setTicket(ticket);
-         history.setAction("ASSIGNED_STUCK_ALERT");
+         history.setAction(TicketHistoryAction.ASSIGNED_STUCK_ALERT);
          history.setDescription("Ticket ASSIGNED sans prise en charge: alerte envoyee agent + manager");
          history.setPerformedBy("System");
          history.setCreatedAt(LocalDateTime.now());
@@ -1222,7 +1244,12 @@ public class TicketService {
    }
 
    private List<TicketResponseDTO> loadWorkbenchBucket(Specification<Ticket> specification, int limit) {
-      List<TicketResponseDTO> tickets = this.ticketRepository.findAll(specification).stream()
+      // Bounded + DB-ordered candidate pool instead of findAll(specification) unbounded: that
+      // pulled every matching ticket system-wide into memory just to sort/truncate to `limit`
+      // (<=20) in Java, which scales with the whole backlog rather than with what's displayed.
+      Pageable candidatePool = PageRequest.of(0, TICKET_QUERY_CANDIDATE_POOL_SIZE,
+         Sort.by(Sort.Order.desc("slaBreached"), Sort.Order.asc("createdAt")));
+      List<TicketResponseDTO> tickets = this.ticketRepository.findAll(specification, candidatePool).stream()
          .map(ticket -> this.mapper.toTicketResponseDTO(ticket))
          .sorted(agentWorkbenchComparator())
          .limit(limit)
@@ -1386,105 +1413,6 @@ public class TicketService {
       return this.alfrescoCmisService.getDocumentContent(nodeRef);
    }
 
-   private List<AgentRecommendationDTO> buildRecommendations(String category, String type, String title, String description) {
-      List<User> agents = this.loadRecommendationAgents();
-      String resolvedCategory = this.resolveRecommendationCategory(category, type, title, description);
-      List<TicketStatus> activeStatuses = List.of(TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.ASSIGNED, TicketStatus.IN_PROGRESS, TicketStatus.ESCALATED_MANUAL, TicketStatus.ESCALATED_SLA);
-      return agents.stream().map((agent) -> this.buildRecommendation(agent, resolvedCategory, activeStatuses)).sorted((a, b) -> Double.compare(b.getRecommendationScore(), a.getRecommendationScore())).toList();
-   }
-
-   private List<User> loadRecommendationAgents() {
-      List<User> agents;
-
-      try {
-         agents = this.keycloakAdminService.syncAndGetAgents();
-         if (agents == null || agents.isEmpty()) {
-            agents = this.userRepository.findAvailableSupportAgents();
-         }
-      } catch (Exception e) {
-         log.warn("Erreur sync Keycloak pour recommandation agents, fallback DB: {}", e.getMessage());
-         agents = this.userRepository.findAvailableSupportAgents();
-      }
-
-      return agents;
-   }
-
-   private String resolveRecommendationCategory(String category, String type, String title, String description) {
-      if (category != null && !category.isBlank()) {
-         return category.trim();
-      }
-
-      String text = String.join(" ",
-         title != null ? title : "",
-         description != null ? description : "",
-         type != null ? type : "")
-         .toLowerCase(Locale.ROOT);
-
-      if (containsAny(text, "auth", "oauth", "sso", "mot de passe", "password", "login", "connexion", "compte", "access")) {
-         return "Authentification";
-      }
-
-      if (containsAny(text, "interface", "ui", "affichage", "ecran", "dashboard", "tableau de bord", "mobile", "graphique", "page")) {
-         return "Interface";
-      }
-
-      if (containsAny(text, "report", "rapport", "reporting", "excel", "export", "csv", "pdf")) {
-         return "Reporting";
-      }
-
-      if (containsAny(text, "vpn", "reseau", "réseau", "wifi", "dns", "latence", "internet", "connectiv", "network")) {
-         return "Réseau";
-      }
-
-      if (containsAny(text, "mail", "email", "smtp", "imap", "outlook", "boite")) {
-         return "Email";
-      }
-
-      if (containsAny(text, "sql", "database", "base de donnees", "base de données", "mysql", "postgres", "oracle", "db")) {
-         return "Base de données";
-      }
-
-      if (containsAny(text, "securite", "sécurité", "security", "permission", "mfa", "2fa", "certificat")) {
-         return "Sécurité";
-      }
-
-      if (containsAny(text, "materiel", "matériel", "imprimante", "pc", "ordinateur", "scanner", "disque", "hardware")) {
-         return "Matériel";
-      }
-
-      if (containsAny(text, "logiciel", "application", "bug", "api", "service", "erp", "crm")) {
-         return "Logiciel";
-      }
-
-      return "Support";
-   }
-
-   private boolean containsAny(String value, String... needles) {
-      for(String needle : needles) {
-         if (value.contains(needle)) {
-            return true;
-         }
-      }
-
-      return false;
-   }
-
-   private AgentRecommendationDTO buildRecommendation(User agent, String category, List<TicketStatus> activeStatuses) {
-      long activeTickets = this.ticketRepository.countByAssignedAgentIdAndStatusIn(agent.getId(), activeStatuses);
-      long breachedActive = this.ticketRepository.countByAssignedAgentIdAndSlaBreachedTrueAndStatusIn(agent.getId(), activeStatuses);
-      long categoryCount = category != null && !category.isBlank() ? this.ticketRepository.countByAssignedAgentAndCategory(agent.getId(), category) : 0L;
-      double availabilityScore = (double)1.0F / ((double)1.0F + (double)activeTickets);
-      double slaCompliance = activeTickets == 0L ? (double)100.0F : (double)(activeTickets - breachedActive) * (double)100.0F / (double)activeTickets;
-      double slaScore = slaCompliance / (double)100.0F;
-      double expertiseScore = category != null && !category.isBlank() ? Math.min((double)1.0F, (double)categoryCount / (double)5.0F) : (double)0.5F;
-      double recommendationScore = 0.45 * availabilityScore + 0.35 * slaScore + 0.2 * expertiseScore;
-      String competencyMatch = category != null && !category.isBlank()
-         ? categoryCount + " ticket(s) similaires traités sur la catégorie " + category
-         : "catégorie non renseignée, scoring basé sur charge et SLA";
-      String reason = "Match compétence: " + competencyMatch + " · Charge active: " + activeTickets + " · SLA: " + Math.round(slaCompliance) + "%";
-      return AgentRecommendationDTO.builder().id(agent.getId()).username(agent.getUsername()).firstName(agent.getFirstName()).lastName(agent.getLastName()).email(agent.getEmail()).fullName(agent.getFullName()).activeTickets(activeTickets).slaComplianceRate((double)Math.round(slaCompliance * (double)100.0F) / (double)100.0F).expertiseScore((double)Math.round(expertiseScore * (double)100.0F) / (double)100.0F).recommendationScore((double)Math.round(recommendationScore * (double)1000.0F) / (double)1000.0F).recommendationReason(reason).build();
-   }
-
    private String normalizeNodeRef(String value) {
       if (value == null || value.isBlank()) {
          return null;
@@ -1511,7 +1439,7 @@ public class TicketService {
          this.reportService.archiveToAlfresco(ticket);
          TicketHistory history = new TicketHistory();
          history.setTicket(ticket);
-         history.setAction("ARCHIVAGE");
+         history.setAction(TicketHistoryAction.ARCHIVAGE);
          history.setOldValue(TicketStatus.CLOSED.name());
          history.setNewValue(ticket.getAlfrescoFolderId());
          history.setDescription(automatic ? "Archivage automatique du ticket" : "Archivage manuel du ticket");
@@ -1525,7 +1453,7 @@ public class TicketService {
       try {
          TicketHistory history = new TicketHistory();
          history.setTicket(ticket);
-         history.setAction("ARCHIVE_SYNC_WARNING");
+         history.setAction(TicketHistoryAction.ARCHIVE_SYNC_WARNING);
          history.setFieldName("alfresco");
          history.setDescription("Archivage GED indisponible pendant " + phase + ". Ticket ferme mais synchronisation archive a verifier.");
          history.setNewValue(error != null ? error.substring(0, Math.min(error.length(), 450)) : "N/A");
@@ -1542,7 +1470,7 @@ public class TicketService {
       try {
          TicketHistory history = new TicketHistory();
          history.setTicket(ticket);
-         history.setAction("CAMUNDA_SYNC_WARNING");
+         history.setAction(TicketHistoryAction.CAMUNDA_SYNC_WARNING);
          history.setFieldName("workflow");
          history.setDescription("Camunda indisponible pendant " + phase + ". Synchronisation workflow a verifier.");
          history.setNewValue(error != null ? error.substring(0, Math.min(error.length(), 450)) : "N/A");
@@ -1557,18 +1485,33 @@ public class TicketService {
 
    private void scheduleTicketCreationSideEffects(Long ticketId) {
       this.runAfterCommit(() -> {
-         this.camundaAsyncService.startTicketProcessAsync(ticketId);
          this.camundaAsyncService.notifyTicketCreatedAsync(ticketId);
       });
    }
 
-   private void completeAssignmentTaskWhenReady(Ticket ticket, String phase) {
-      if (ticket.getProcessInstanceId() != null) {
-         this.camundaService.completeAssignmentTask(ticket);
+   private void enqueueWorkflowSync(Ticket ticket, WorkflowSyncAction action, String payload, String eventKey) {
+      if (!this.camundaEnabled) {
+         log.debug("Integration Camunda desactivee: action {} ignoree pour {}", action, ticket.getReference());
          return;
       }
 
-      this.runAfterCommit(() -> this.camundaAsyncService.completeAssignmentTaskAsync(ticket.getId(), phase));
+      Long ticketId = ticket.getId();
+      String ticketReference = ticket.getReference();
+      this.runAfterCommit(() -> {
+         try {
+            Ticket committedTicket = (Ticket)this.ticketRepository.findById(ticketId)
+               .orElseThrow(() -> new ResourceNotFoundException("Ticket non trouve apres commit: " + ticketId));
+            this.workflowSyncService.enqueue(committedTicket, action, payload, eventKey);
+         } catch (Exception e) {
+            log.error("Impossible de mettre en file la synchronisation {} pour {} apres commit: {}",
+               action, ticketReference, e.getMessage(), e);
+         }
+      });
+   }
+
+   private void completeAssignmentTaskWhenReady(Ticket ticket, String phase) {
+      String eventKey = ticket.getAssignedAt() != null ? ticket.getAssignedAt().toString() : phase;
+      this.enqueueWorkflowSync(ticket, WorkflowSyncAction.ASSIGN, null, eventKey);
    }
 
    private void runAfterCommit(Runnable action) {

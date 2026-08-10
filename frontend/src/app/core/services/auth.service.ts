@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { KeycloakService } from 'keycloak-angular';
 import { KeycloakProfile } from 'keycloak-js';
 import { Observable, of } from 'rxjs';
-import { UserRole } from '../models';
+import { Ticket, UserRole } from '../models';
 
 export interface UserInfo {
   username: string;
@@ -11,6 +11,12 @@ export interface UserInfo {
   lastName: string;
   emailVerified: boolean;
 }
+
+/** Every action canActOnTicket() is asked to gate. */
+export type TicketAction =
+  | 'view' | 'edit' | 'take-charge' | 'resolve' | 'escalate' | 'assign'
+  | 'escalate-sla' | 'manager-review' | 'sla-pause' | 'sla-resume' | 'sla-extend'
+  | 'change-status' | 'close' | 'reopen' | 'delete' | 'archive' | 'comment-internal';
 
 @Injectable({
   providedIn: 'root'
@@ -27,7 +33,28 @@ export class AuthService {
   }
 
   login(): Promise<void> { return this.keycloak.login(); }
-  logout(): Promise<void> { return this.keycloak.logout(window.location.origin); }
+
+  async logout(): Promise<void> {
+    // The Angular service worker caches /api/** responses (network-first, but served from
+    // cache on a slow/failed network within its freshness window). Without purging on logout,
+    // a network hiccup right after a different user logs in on the same shared device could
+    // briefly serve this user's cached, previously-authenticated API responses. Purge before
+    // Keycloak's own logout redirect fires.
+    await this.purgeServiceWorkerCaches();
+    return this.keycloak.logout(window.location.origin);
+  }
+
+  private async purgeServiceWorkerCaches(): Promise<void> {
+    if (typeof caches === 'undefined') {
+      return;
+    }
+    try {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    } catch {
+      // Best-effort: never block logout on cache cleanup failure.
+    }
+  }
   getUsername(): string {
     try {
       return this.keycloak.getUsername() || '';
@@ -56,7 +83,8 @@ export class AuthService {
       const tokenParsed = this.keycloak.getKeycloakInstance()?.tokenParsed as any;
       if (tokenParsed?.realm_access?.roles) roles = tokenParsed.realm_access.roles;
       if (tokenParsed?.resource_access) {
-        Object.values(tokenParsed.resource_access).forEach((access: any) => {
+        ['supportflow-frontend', 'supportflow-backend'].forEach(clientId => {
+          const access = tokenParsed.resource_access[clientId];
           if (access?.roles) roles = [...roles, ...access.roles];
         });
       }
@@ -114,7 +142,7 @@ export class AuthService {
    * @param action  'view' | 'edit' | 'assign' | 'take-charge' | 'escalate' |
    *                'escalate-sla' | 'manager-review' | 'resolve' | 'close' | 'delete' | 'comment-internal'
    */
-  canActOnTicket(ticket: any, action: string): boolean {
+  canActOnTicket(ticket: Ticket | null | undefined, action: TicketAction): boolean {
     const role = this.getPrimaryRole();
     const myUsername = this.getUserInfo()?.username?.toLowerCase();
 

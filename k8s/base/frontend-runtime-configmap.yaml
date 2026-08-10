@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supportflow-frontend-runtime
+  namespace: supportflow
+data:
+  runtime-config.js: |
+    window.__SUPPORTFLOW_CONFIG__ = {
+      apiUrl: "/api",
+      websocketUrl: "/api/ws",
+      keycloakUrl: "https://keycloak.supportflow.example.com",
+      alfrescoShareUrl: "https://alfresco.supportflow.example.com/share"
+    };

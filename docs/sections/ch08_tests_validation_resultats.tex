@@ -1,0 +1,198 @@
+﻿\chapter{Tests, validation et resultats}
+
+\section{Importance des tests dans SupportFlow}
+
+Etant donne la richesse fonctionnelle du projet, les tests ne peuvent pas se limiter a un simple ping des endpoints. Il faut valider la coherence metier, l'integrite des permissions, la synchronisation du workflow, le comportement de l'interface et la solidite du seed de demonstration.
+
+\section{Types de validation observables}
+
+Dans le depot, on retrouve plusieurs formes de validation :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item scripts de test PowerShell ;
+  \item scripts de demonstration shell ;
+  \item healthchecks Docker ;
+  \item compilation Maven ;
+  \item build Angular ;
+  \item verifications manuelles par parcours utilisateur ;
+  \item observation de Camunda Cockpit.
+\end{itemize}
+
+\section{Validation technique de la chaine qualite}
+
+La validation du projet ne s'est pas limitee aux parcours fonctionnels. Une partie importante du travail a consiste a verifier que la chaine technique etait elle aussi exploitable. Cette verification s'appuie sur plusieurs preuves :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item compilation backend Maven ;
+  \item build frontend Angular en mode production ;
+  \item analyse SonarQube sur le backend Java et le frontend TypeScript ;
+  \item scan securite des images conteneur avec Trivy ;
+  \item construction et publication des images applicatives dans GHCR ;
+  \item mise a jour des manifests Kubernetes et synchronisation GitOps via ArgoCD.
+\end{itemize}
+
+\section{GitHub Actions, SonarQube et GitOps}
+
+Le projet SupportFlow dispose d'une chaine CI/CD structuree. Dans le depot, le workflow GitHub Actions couvre la compilation, le build frontend, l'analyse qualite, le scan securite et la preparation du deploiement. Cette chaine joue un double role : elle valide le code et elle constitue une preuve concrete de maturite technique pour la soutenance.
+
+L'analyse SonarQube permet d'evaluer la qualite du code de facon reproductible. Dans le projet, elle est mobilisee comme preuve de bonne pratique, non comme simple accessoire. De meme, la partie GitOps montre que le deploiement cible ne repose pas uniquement sur une execution manuelle locale, mais sur une logique versionnee et synchronisable.
+
+\section{Validation des integrations externes}
+
+Une plateforme comme SupportFlow n'est correcte que si ses integrations essentielles repondent ensemble. Les validations ont donc porte sur :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Keycloak pour l'authentification et les roles ;
+  \item Camunda pour les processus et timers SLA ;
+  \item Alfresco pour l'archivage et la consultation documentaire ;
+  \item l'agent IA pour l'analyse, la suggestion et le resume d'escalade ;
+  \item Kubernetes et ArgoCD pour la preuve de synchronisation GitOps.
+\end{itemize}
+
+\section{Corrections recentes significatives}
+
+Le projet a connu plusieurs corrections importantes qui illustrent une phase de consolidation tres interessante.
+
+\subsection{Acceleration de la creation de ticket}
+
+La creation de ticket pouvait paraitre lente car certains traitements annexes bloquaient la reponse. Le travail recent a consiste a deplacer certains traitements Camunda et certaines notifications hors du chemin critique de la creation. Ce type de correction montre une bonne comprehension de la difference entre logique metier synchrone et taches asynchrones.
+
+\subsection{Alignement des autorisations}
+
+Des incoherences existaient entre ce que le frontend laissait voir et ce que le backend autorisait reellement. Le recent durcissement de la matrice RBAC cote backend et son alignement cote frontend ont apporte une meilleure clarte.
+
+\subsection{Rehydratation des workflows Camunda}
+
+Les tickets injectes directement en base ne creaient pas automatiquement leurs processus Camunda. La mise en place d'un service de bootstrap a corrige ce decalage et a restaure la lisibilite du moteur dans Cockpit.
+
+\subsection{Modale d'assignation}
+
+L'ecran de validation manager de l'assignation pouvait rester charge trop longtemps. Le projet a ete corrige pour charger d'abord une liste de secours, puis enrichir avec l'IA si elle repond. Ce comportement est bien plus robuste.
+
+\subsection{Liste complete des candidats d'assignation}
+
+La modale d'assignation n'affichait initialement qu'une shortlist restreinte. Elle montre desormais aussi les profils non eligibles avec leur etat. Cette modification augmente fortement la comprehensibilite du systeme.
+
+\subsection{Outils IA ticket}
+
+L'assistant IA pouvait retourner des erreurs lorsque l'utilisateur saisissait une reference de ticket au lieu de l'ID interne. La resolution automatique des identifiants a corrige ce point et rendu l'interface plus naturelle.
+
+\subsection{Tri des clients}
+
+Une erreur de tri sur le champ \code{name} au lieu de \code{companyName} provoquait un \code{500}. Ce type de correction est discret mais important, car il montre l'importance de l'alignement entre frontend et modele backend.
+
+\section{Enseignements tires de ces corrections}
+
+Ces corrections montrent trois choses. D'abord, les vrais problemes se situent souvent a l'interface entre composants, plus que dans les composants eux-memes. Ensuite, les parcours utilisateurs et les seeds de demonstration jouent un role majeur dans la qualite percue. Enfin, le projet gagne en maturite a mesure qu'il transforme les erreurs brutes en comportements robustes et comprehensibles.
+
+
+
+\section{Validation des parcours par profil}
+
+\subsection{Lecture par profil}
+
+Pour apprecier la qualite fonctionnelle de SupportFlow, il est utile de lire l'application non pas uniquement par modules techniques, mais par profils utilisateurs. Cette lecture montre comment l'outil se comporte du point de vue des besoins concrets.
+
+\section{Le client}
+
+\subsection{Objectif du client}
+
+Le client souhaite avant tout declarer un probleme, suivre son traitement et obtenir une resolution claire. Il ne cherche pas a gerer la complexite interne du support ; il attend surtout transparence et reactivite.
+
+\subsection{Parcours type}
+
+Le parcours type du client est le suivant :
+
+\begin{enumerate}[leftmargin=1.2cm]
+  \item connexion ;
+  \item creation d'un ticket ;
+  \item ajout de precisions si necessaire ;
+  \item lecture des reponses publiques ;
+  \item suivi de l'etat ;
+  \item validation ou refus de la resolution.
+\end{enumerate}
+
+\subsection{Attentes principales}
+
+Les attentes principales du client sont simples mais exigeantes :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item savoir si sa demande a bien ete prise en compte ;
+  \item comprendre l'etat du traitement ;
+  \item disposer d'un retour lisible ;
+  \item pouvoir refuser une resolution insuffisante.
+\end{itemize}
+
+\section{L'agent support}
+
+\subsection{Objectif de l'agent}
+
+L'agent a besoin d'un espace de travail clair lui permettant de comprendre rapidement le dossier, d'agir sans ambiguite et de laisser des traces utiles pour la suite. Il doit sentir que l'outil l'aide reellement plutot qu'il ne lui impose une charge administrative inutile.
+
+\subsection{Parcours type}
+
+Le parcours type de l'agent comprend :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item consulter sa file ;
+  \item prendre un ticket si necessaire ;
+  \item analyser le probleme ;
+  \item commenter ;
+  \item joindre des preuves ou documents ;
+  \item produire une resolution ;
+  \item eventuellement escalader.
+\end{itemize}
+
+\subsection{Apports de l'IA}
+
+Pour l'agent, l'IA n'a de valeur que si elle accelere des gestes repetitifs. Une suggestion de reponse ou un resume de contexte peuvent aider, mais l'outil doit rester pleinement utilisable meme si l'IA est indisponible.
+
+\section{Le manager}
+
+\subsection{Objectif du manager}
+
+Le manager cherche a piloter. Son besoin principal n'est pas de traiter chaque ticket a la place de l'agent, mais de voir les zones de tension : surcharge, tickets sans proprietaire, tickets a risque, depassements, retours client, demandes d'arbitrage.
+
+\subsection{Parcours type}
+
+Le manager ouvre les tableaux de bord, consulte les listes, attribue les dossiers, suit les alertes SLA, demande des revues manager et intervient lorsque l'organisation doit etre reajustee.
+
+\subsection{Lecture de la modale d'assignation}
+
+L'evolution de la modale d'assignation est tres representative du besoin manager. Une simple shortlist opaque ne suffit pas. Le manager a besoin de comprendre pourquoi certains agents sont proposes et pourquoi d'autres ne le sont pas. L'affichage des etats \code{deja assigne}, \code{en pause}, \code{occupe} ou \code{capacite atteinte} repond bien a cette attente.
+
+\section{L'administrateur}
+
+\subsection{Objectif de l'administrateur}
+
+L'administrateur agit comme garant de l'integrite globale. Il intervient sur les utilisateurs, les clients, l'infrastructure, les redemarrages, les seeds de demo et les problemes de synchronisation. Son espace de travail est donc hybride : a la fois metier et technique.
+
+\subsection{Vision systeme}
+
+Pour l'administrateur, la valeur de SupportFlow tient aussi dans les outils annexes :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item Camunda Cockpit ;
+  \item Keycloak ;
+  \item Alfresco Share ;
+  \item healthchecks Docker ;
+  \item scripts de diagnostic.
+\end{itemize}
+
+\section{Interet de cette lecture}
+
+La lecture par profil montre que SupportFlow n'est pas pense comme une simple interface uniforme pour tous. Chaque acteur y trouve un usage specifique, des ecrans differents et des responsabilites propres. Cette approche renforce la pertinence metier du projet.
+
+\section{Resultats observes}
+
+Les validations menees permettent de conclure que le projet atteint un niveau de maturite convaincant pour un stage de fin d'etudes. Les parcours critiques sont demonstrables, les integrations majeures sont visibles, les APIs principales sont exploitables et la chaine de qualite est documentee. Les resultats les plus importants sont les suivants :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item un cycle ticket coherent du client jusqu'a l'archivage ;
+  \item une supervision manager plus claire grace aux files de priorite, aux alertes et aux escalades ;
+  \item une experience agent amelioree par les outils d'aide et les actions directes ;
+  \item une preuve de qualite logicielle et de deploiement au travers de GitHub Actions, SonarQube et GitOps ;
+  \item une base documentaire et une soutenance mieux preparees grace a la formalisation des guides et des preuves.
+\end{itemize}
+
+

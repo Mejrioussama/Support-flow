@@ -2,7 +2,9 @@
 // SupportFlow âÂÂ Global Styles & Design System
 // ============================================================
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+// Avoid remote variable-font downloads in local/demo browsers; components keep
+// the same visual hierarchy via local fallbacks when Inter/Space Grotesk are
+// unavailable on the host.
 
 // ============================================================
 // DESIGN TOKENS âÂÂ Source unique de vérité

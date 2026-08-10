@@ -17,7 +17,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Subscription } from 'rxjs';
 
-import { TicketService, AuthService, WebSocketService, UserService, AIService, AICopilot, AIKnowledgeDraft, NotificationService, KnowledgeBaseService } from '@core/services';
+import { TicketService, AuthService, TicketAction, WebSocketService, UserService, AIService, AICopilot, AIKnowledgeDraft, NotificationService, KnowledgeBaseService } from '@core/services';
 import { Ticket, Comment, Attachment, TicketArchiveDocument as TicketArchiveDocumentApi, TicketHistoryEntry, TicketStatus, TicketPriority, UserSummary, WorkflowStatus, WorkflowTrace, Notification, WaitingOn, isSlaNotification, KnowledgeArticle } from '@core/models';
 import { environment } from '@env/environment';
 import { EscalateDialogComponent, EscalateDialogResult } from '../escalate-dialog/escalate-dialog.component';
@@ -3635,7 +3635,7 @@ export class TicketDetailComponent implements OnInit, OnDestroy {
     return this.authService.isManager();
   }
 
-  canAct(action: string): boolean {
+  canAct(action: TicketAction): boolean {
     if (!this.ticket) return false;
     return this.authService.canActOnTicket(this.ticket, action);
   }
@@ -3657,11 +3657,11 @@ export class TicketDetailComponent implements OnInit, OnDestroy {
       || (this.ticket.status === 'PENDING' && !this.ticket.slaPaused);
   }
 
-  canTriggerAction(action: string): boolean {
+  canTriggerAction(action: TicketAction): boolean {
     return this.canAct(action);
   }
 
-  getActionTooltip(action: string): string {
+  getActionTooltip(action: TicketAction): string {
     if (this.canTriggerAction(action)) return '';
     
     const tooltips: Record<string, string> = {

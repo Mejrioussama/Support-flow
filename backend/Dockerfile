@@ -34,16 +34,16 @@ USER supportflow
 
 # Container-aware JVM memory management (overrides JAVA_TOOL_OPTIONS from compose)
 ENV JAVA_TOOL_OPTIONS="\
-  -XX:InitialRAMPercentage=30.0 \
-  -XX:MaxRAMPercentage=70.0 \
+  -XX:InitialRAMPercentage=20.0 \
+  -XX:MaxRAMPercentage=65.0 \
   -XX:+UseG1GC \
   -XX:+ExitOnOutOfMemoryError \
   -Djava.security.egd=file:/dev/./urandom"
 
 ENV SPRING_PROFILES_ACTIVE=docker
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health/readiness || exit 1
 
 EXPOSE 8080
 

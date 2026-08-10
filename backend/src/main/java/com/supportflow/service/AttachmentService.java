@@ -28,6 +28,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -45,6 +47,16 @@ public class AttachmentService {
     @Value("${supportflow.storage.upload-dir:uploads}")
     private String uploadDir;
 
+    // Explicit allowlist of extensions accepted for ticket attachments. Anything else is
+    // rejected up front instead of trusting whatever the client sends (e.g. executables, scripts).
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "rtf", "odt", "ods", "odp",
+        "txt", "csv", "log", "json", "xml",
+        "png", "jpg", "jpeg", "gif", "bmp", "webp",
+        "zip", "rar", "7z",
+        "msg", "eml"
+    );
+
     @Transactional(readOnly = true)
     public List<AttachmentDTO> listByTicket(Long ticketId) {
         if (!ticketRepository.existsById(ticketId)) {
@@ -58,6 +70,9 @@ public class AttachmentService {
             throw new BusinessException("Fichier vide");
         }
 
+        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
+        validateExtension(originalName);
+
         Ticket ticket = ticketRepository.findById(ticketId)
             .orElseThrow(() -> new ResourceNotFoundException("Ticket non trouve: " + ticketId));
         User user = userId != null ? userRepository.findById(userId).orElse(null) : null;
@@ -66,12 +81,19 @@ public class AttachmentService {
             Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
             Files.createDirectories(uploadPath);
 
-            String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
             String safeOriginal = originalName.replaceAll("[^a-zA-Z0-9._-]", "_");
             String storedName = UUID.randomUUID() + "_" + safeOriginal;
 
             Path destination = uploadPath.resolve(storedName);
             Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
+
+            // Prefer the JDK's own file-type detection over the client-supplied Content-Type
+            // header, which is attacker-controlled and was previously trusted as-is and echoed
+            // straight back on download.
+            String detectedContentType = probeContentType(destination);
+            String resolvedContentType = detectedContentType != null
+                ? detectedContentType
+                : (file.getContentType() != null ? file.getContentType() : "application/octet-stream");
 
             Attachment attachment = Attachment.builder()
                 .ticket(ticket)
@@ -80,7 +102,7 @@ public class AttachmentService {
                 .originalName(originalName)
                 .filePath(destination.toString())
                 .fileSize(file.getSize())
-                .contentType(file.getContentType())
+                .contentType(resolvedContentType)
                 .description(description)
                 .build();
 
@@ -93,6 +115,25 @@ public class AttachmentService {
             return mapper.toAttachmentDTO(attachment);
         } catch (IOException e) {
             throw new BusinessException("Impossible d'enregistrer le fichier: " + e.getMessage());
+        }
+    }
+
+    private void validateExtension(String originalName) {
+        int dotIndex = originalName.lastIndexOf('.');
+        String extension = dotIndex >= 0 && dotIndex < originalName.length() - 1
+            ? originalName.substring(dotIndex + 1).toLowerCase(Locale.ROOT)
+            : "";
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new BusinessException("Type de fichier non autorise: ." + extension);
+        }
+    }
+
+    private String probeContentType(Path path) {
+        try {
+            return Files.probeContentType(path);
+        } catch (IOException e) {
+            log.warn("Impossible de detecter le type de contenu pour {}: {}", path, e.getMessage());
+            return null;
         }
     }
 

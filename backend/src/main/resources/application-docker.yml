@@ -24,13 +24,11 @@ spring:
     
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
         format_sql: false
-    defer-datasource-initialization: true
-
   sql:
     init:
       mode: never
@@ -67,10 +65,11 @@ logging:
 
 # Simplified SLA escalation for demo and jury
 supportflow:
+  security:
+    allowed-origins: ${SUPPORTFLOW_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
+    portal-url: ${SUPPORTFLOW_SECURITY_PORTAL_URL:http://localhost:8180/realms/supportflow/account}
   frontend:
     base-url: ${SUPPORTFLOW_FRONTEND_URL:http://localhost:4200}
-  security:
-    portal-url: ${SUPPORTFLOW_SECURITY_PORTAL_URL:http://localhost:8180/realms/supportflow/account}
   mail:
     from: ${SUPPORTFLOW_MAIL_FROM:no-reply@supportflow.com}
   notifications:

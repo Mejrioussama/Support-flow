@@ -76,7 +76,7 @@
       "description": "Backend REST API",
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "supportflow-backend-secret",
+      "secret": "${env.KEYCLOAK_BACKEND_CLIENT_SECRET:supportflow-backend-secret}",
       "bearerOnly": true,
       "consentRequired": false,
       "standardFlowEnabled": false,
@@ -101,19 +101,19 @@
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
         "http://localhost:4200/*",
+        "http://127.0.0.1:4200/*",
         "http://localhost:8080/*",
+        "http://127.0.0.1:8080/*",
         "http://localhost:30088/*",
-        "http://127.0.0.1:30088/*",
-        "http://localhost:*/*",
-        "http://127.0.0.1:*/*"
+        "http://127.0.0.1:30088/*"
       ],
       "webOrigins": [
         "http://localhost:4200",
+        "http://127.0.0.1:4200",
         "http://localhost:8080",
+        "http://127.0.0.1:8080",
         "http://localhost:30088",
-        "http://127.0.0.1:30088",
-        "http://localhost:*",
-        "http://127.0.0.1:*"
+        "http://127.0.0.1:30088"
       ],
       "bearerOnly": false,
       "consentRequired": false,

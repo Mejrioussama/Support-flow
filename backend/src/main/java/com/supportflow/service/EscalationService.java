@@ -16,6 +16,7 @@ import com.supportflow.entity.enums.AgentStatus;
 import com.supportflow.entity.enums.EscalationEvaluationTrigger;
 import com.supportflow.entity.enums.EscalationReason;
 import com.supportflow.entity.enums.EscalationTrigger;
+import com.supportflow.entity.enums.TicketHistoryAction;
 import com.supportflow.entity.enums.Priority;
 import com.supportflow.entity.enums.Role;
 import com.supportflow.entity.enums.SkillMatchType;
@@ -165,7 +166,7 @@ public class EscalationService {
             }
             boolean hasRecentL3 = historyRepository.existsByTicketIdAndActionAndCreatedAtAfter(
                 ticket.getId(),
-                "ESCALATION_L3",
+                TicketHistoryAction.ESCALATION_L3,
                 now.minusMinutes(getLevel3Delay(policy)));
             if (hasRecentL3) {
                 continue;
@@ -191,7 +192,7 @@ public class EscalationService {
         ticket.setEscalationHoldReason(reason);
         ticket = ticketRepository.save(ticket);
 
-        recordHistory(ticket, "ESCALATION_HOLD", null, holdMinutes + "min",
+        recordHistory(ticket, TicketHistoryAction.ESCALATION_HOLD, null, holdMinutes + "min",
             "Escalade en hold " + holdMinutes + "min. Raison: " + reason);
         recordEvent(ticket, currentLevel(ticket), currentLevel(ticket),
             EscalationReason.HOLD_ACTIVE, EscalationTrigger.USER,
@@ -211,7 +212,7 @@ public class EscalationService {
         ticket.setEscalationHoldReason(null);
         ticket = ticketRepository.save(ticket);
 
-        recordHistory(ticket, "ESCALATION_HOLD_RELEASED", null, null, "Hold d'escalade libere manuellement");
+        recordHistory(ticket, TicketHistoryAction.ESCALATION_HOLD_RELEASED, null, null, "Hold d'escalade libere manuellement");
         return mapper.toTicketResponseDTO(ticket);
     }
 
@@ -298,7 +299,7 @@ public class EscalationService {
         adjustSlaAfterEscalation(ticket);
         ticket = ticketRepository.save(ticket);
 
-        recordHistory(ticket, "ESCALATION_L1",
+        recordHistory(ticket, TicketHistoryAction.ESCALATION_L1,
             oldAgent != null ? oldAgent.getFullName() : "Non assigne",
             newAgent.getFullName(),
             "Reaffectation intelligente vers " + newAgent.getFullName()
@@ -337,7 +338,7 @@ public class EscalationService {
 
         ticket = ticketRepository.save(ticket);
 
-        recordHistory(ticket, "ESCALATION_L2",
+        recordHistory(ticket, TicketHistoryAction.ESCALATION_L2,
             String.valueOf(previousLevel), "2",
             "Supervision manager activee. Le ticket reste exploitable mais marque pour compatibilite ESCALATED_SLA.");
         recordEvent(ticket, previousLevel, 2, reason, trigger, ticket.getAssignedAgent(), null,
@@ -359,7 +360,7 @@ public class EscalationService {
 
         User manager = findAvailableManager();
         if (manager == null) {
-            recordHistory(ticket, "ESCALATION_L3_FAILED", null, null,
+            recordHistory(ticket, TicketHistoryAction.ESCALATION_L3_FAILED, null, null,
                 "Escalade L3 echouee: aucun manager ou admin disponible");
             recordEvent(ticket, currentLevel(ticket), 3, EscalationReason.NO_AGENT_AVAILABLE,
                 trigger, ticket.getAssignedAgent(), null,
@@ -386,7 +387,7 @@ public class EscalationService {
 
         ticket = ticketRepository.save(ticket);
 
-        recordHistory(ticket, "ESCALATION_L3",
+        recordHistory(ticket, TicketHistoryAction.ESCALATION_L3,
             oldAgent != null ? oldAgent.getFullName() : "N/A",
             manager.getFullName(),
             "Prise en charge manager par " + manager.getFullName());
@@ -898,7 +899,7 @@ public class EscalationService {
             || status == TicketStatus.RESOLVED;
     }
 
-    private void recordHistory(Ticket ticket, String action, String oldValue, String newValue, String description) {
+    private void recordHistory(Ticket ticket, TicketHistoryAction action, String oldValue, String newValue, String description) {
         TicketHistory history = new TicketHistory();
         history.setTicket(ticket);
         history.setAction(action);

@@ -27,7 +27,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
     command: >
-      --innodb-buffer-pool-size=256M
+      --innodb-buffer-pool-size=384M
       --max-connections=150
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
@@ -42,9 +42,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: ${MYSQL_MEMORY_LIMIT:-1g}
         reservations:
-          memory: 256m
+          memory: ${MYSQL_MEMORY_RESERVATION:-512m}
 
   # ============================================
   # KEYCLOAK - GESTION DES IDENTITES
@@ -68,6 +68,7 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_LOG_LEVEL: "WARN"
       KC_CACHE: "local"
+      KEYCLOAK_BACKEND_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:-supportflow-backend-secret}
     command: start-dev --import-realm
     volumes:
       - ./keycloak/supportflow-realm.json:/opt/keycloak/data/import/supportflow-realm.json
@@ -117,6 +118,7 @@ services:
       ALFRESCO_USERNAME: admin
       ALFRESCO_PASSWORD: admin
       AI_AGENT_URL: http://ai-agent:8000
+      SUPPORTFLOW_ALLOWED_ORIGINS: ${SUPPORTFLOW_ALLOWED_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}
       SUPPORTFLOW_ESCALATION_LEVEL1_THRESHOLD: ${SUPPORTFLOW_ESCALATION_LEVEL1_THRESHOLD:-90}
       SUPPORTFLOW_ESCALATION_LEVEL2_DELAY_MINUTES: ${SUPPORTFLOW_ESCALATION_LEVEL2_DELAY_MINUTES:-15}
       SUPPORTFLOW_ESCALATION_LEVEL3_DELAY_MINUTES: ${SUPPORTFLOW_ESCALATION_LEVEL3_DELAY_MINUTES:-30}
@@ -124,8 +126,8 @@ services:
       SUPPORTFLOW_ESCALATION_COOLDOWN_MINUTES: ${SUPPORTFLOW_ESCALATION_COOLDOWN_MINUTES:-5}
       SUPPORTFLOW_ESCALATION_MAX_ESCALATIONS: ${SUPPORTFLOW_ESCALATION_MAX_ESCALATIONS:-10}
       JAVA_TOOL_OPTIONS: >-
-        -XX:InitialRAMPercentage=30.0
-        -XX:MaxRAMPercentage=70.0
+        -XX:InitialRAMPercentage=${BACKEND_JAVA_INITIAL_RAM_PERCENTAGE:-20.0}
+        -XX:MaxRAMPercentage=${BACKEND_JAVA_MAX_RAM_PERCENTAGE:-65.0}
         -XX:+UseG1GC
         -XX:+ExitOnOutOfMemoryError
         -Djava.security.egd=file:/dev/./urandom
@@ -143,17 +145,17 @@ services:
     networks:
       - supportflow-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/actuator/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/actuator/health/readiness"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 180s
     deploy:
       resources:
         limits:
-          memory: 768m
+          memory: ${BACKEND_MEMORY_LIMIT:-1536m}
         reservations:
-          memory: 384m
+          memory: ${BACKEND_MEMORY_RESERVATION:-768m}
 
   # ============================================
   # FRONTEND ANGULAR
@@ -166,14 +168,14 @@ services:
     restart: unless-stopped
     logging: *default-logging
     ports:
-      - "4200:80"
+      - "4200:8080"
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
       keycloak:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -356,7 +358,7 @@ services:
   # MAILHOG - SERVEUR EMAIL DE TEST
   # ============================================
   mailhog:
-    image: mailhog/mailhog:latest
+    image: mailhog/mailhog:v1.0.1
     container_name: supportflow-mailhog
     restart: unless-stopped
     logging: *default-logging

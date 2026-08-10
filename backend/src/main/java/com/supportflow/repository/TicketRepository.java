@@ -26,6 +26,14 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     
     Optional<Ticket> findByReference(String reference);
 
+    @Query("SELECT t FROM Ticket t WHERE (t.processInstanceId IS NULL OR t.processInstanceId = '') " +
+           "AND t.status <> 'CANCELLED' ORDER BY t.id")
+    List<Ticket> findTicketsMissingProcessInstance(Pageable pageable);
+
+    @Query("SELECT t FROM Ticket t WHERE t.status = 'CLOSED' " +
+           "AND t.processInstanceId IS NOT NULL AND t.processInstanceId <> '' ORDER BY t.id")
+    List<Ticket> findClosedTicketsWithProcessInstance(Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT t FROM Ticket t WHERE t.id = :id")
     Optional<Ticket> findByIdForUpdate(@Param("id") Long id);
@@ -62,8 +70,12 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     List<Ticket> findByAssignedAgentIdAndStatusIn(Long agentId, List<TicketStatus> statuses);
     
     // Tickets non assignés
-    @Query("SELECT t FROM Ticket t WHERE t.assignedAgent IS NULL AND t.status IN ('NEW', 'OPEN')")
-    List<Ticket> findUnassignedTickets();
+    // Bounded + ordered by urgency (breached first, then oldest first) instead of loading the
+    // entire unassigned backlog unbounded: with Pageable this returns only the top-N candidates
+    // most worth seeing first, capping memory/CPU cost regardless of backlog size.
+    @Query("SELECT t FROM Ticket t WHERE t.assignedAgent IS NULL AND t.status IN ('NEW', 'OPEN') " +
+           "ORDER BY t.slaBreached DESC, t.createdAt ASC")
+    List<Ticket> findUnassignedTickets(Pageable pageable);
     
     // SLA Management
     @Query("SELECT t FROM Ticket t WHERE t.slaDeadline < :now AND t.slaBreached = false " +
@@ -180,11 +192,6 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
            "FROM Ticket t WHERE t.assignedAgent IS NOT NULL " +
            "GROUP BY t.assignedAgent.id, t.assignedAgent.firstName, t.assignedAgent.lastName")
     List<Object[]> countTicketsByAgent();
-    
-    // Génération de référence
-    @Query("SELECT MAX(CAST(SUBSTRING(t.reference, 4) AS integer)) FROM Ticket t " +
-           "WHERE t.reference LIKE 'SF-%'")
-    Integer findMaxReferenceNumber();
     
     // Tickets récents
     @Query("SELECT t FROM Ticket t ORDER BY t.createdAt DESC")
