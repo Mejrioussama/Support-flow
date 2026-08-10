@@ -70,4 +70,4 @@ VALUES
 (2, 'Ticket assigne', 'Le ticket SF-0002 vous a ete assigne', 'TICKET_ASSIGNED', 'pi-user', '/tickets/2', false, 'SF-0002', 4, 2, NOW(), NOW(), 0);
 
 -- Compteur de reference tickets (doit demarrer apres le dernier SF-#### seede ci-dessus)
-INSERT INTO ticket_reference_sequence (id, last_value) VALUES (1, 4);
+INSERT INTO ticket_reference_sequence (id, seq_value) VALUES (1, 4);

@@ -25,6 +25,6 @@ public class TicketReferenceSequence {
     @Id
     private Long id;
 
-    @Column(name = "last_value", nullable = false)
+    @Column(name = "seq_value", nullable = false)
     private Integer lastValue;
 }

@@ -253,7 +253,7 @@ jobs:
       # checksum verification). Report step never fails the job, so the SARIF upload always runs
       # even when vulnerabilities are found.
       - name: Trivy filesystem scan (report)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scan-ref: .
@@ -269,7 +269,7 @@ jobs:
       # Critical/High findings never blocked docker-build/deploy. This fails the job (and the
       # docker-build/update-gitops-manifests/argocd-sync chain that depends on it) on real findings.
       - name: Trivy filesystem scan (fail on Critical/High)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scan-ref: .
