@@ -232,8 +232,12 @@ jobs:
           -Dsonar.login=$SONAR_TOKEN
       - name: Frontend SonarQube
         working-directory: ./frontend
+        # "sonar-scanner" on npm is a stale, unmaintained package that resolves an ancient
+        # scanner requiring the system JRE (Java 17 here) - this SonarQube server needs Java 21+
+        # for analysis. "sonarqube-scanner" is the actively maintained SonarSource package and
+        # auto-provisions its own compatible JRE, independent of the system Java version.
         run: >
-          npx sonar-scanner
+          npx sonarqube-scanner
           -Dsonar.projectKey=supportflow-frontend
           -Dsonar.sources=src
           -Dsonar.host.url=$SONAR_HOST_URL
