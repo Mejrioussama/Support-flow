@@ -266,18 +266,19 @@ jobs:
       - name: Populate Maven cache for dependency scanning
         working-directory: ./backend
         run: mvn dependency:resolve -B -q
-      # Maintained GitHub Action pinned to a specific release, instead of the previous
-      # `curl https://.../main/contrib/install.sh | sh` (fetched from a mutable branch with no
-      # checksum verification). Report step never fails the job, so the SARIF upload always runs
+      # Run the official Trivy Docker image directly, pinned to a specific release, instead of
+      # the previous `curl https://.../main/contrib/install.sh | sh` (fetched from a mutable
+      # branch with no checksum verification). Also instead of aquasecurity/trivy-action, whose
+      # bundled setup-trivy sub-action's contrib/install.sh reproducibly died silently (exit code
+      # 1, no diagnostic output) right after resolving the release tag - confirmed from a real CI
+      # log, likely a cosign/sigstore verification failure reaching external infrastructure. This
+      # sidesteps that fragile binary-install layer entirely; every GitHub-hosted runner already
+      # has Docker available. Report step never fails the job, so the SARIF upload always runs
       # even when vulnerabilities are found.
       - name: Trivy filesystem scan (report)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-results.sarif
-          exit-code: 0
+        run: >
+          docker run --rm -v "$PWD:/repo" -w /repo aquasec/trivy:0.73.0
+          fs --format sarif --output trivy-results.sarif --exit-code 0 .
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
         continue-on-error: true
@@ -287,13 +288,9 @@ jobs:
       # Critical/High findings never blocked docker-build/deploy. This fails the job (and the
       # docker-build/update-gitops-manifests/argocd-sync chain that depends on it) on real findings.
       - name: Trivy filesystem scan (fail on Critical/High)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: table
-          severity: CRITICAL,HIGH
-          exit-code: 1
+        run: >
+          docker run --rm -v "$PWD:/repo" -w /repo aquasec/trivy:0.73.0
+          fs --format table --severity CRITICAL,HIGH --exit-code 1 .
 
   docker-build:
     name: Build and Push Images
