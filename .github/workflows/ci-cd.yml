@@ -248,6 +248,20 @@ jobs:
     needs: [backend-build, frontend-build]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+      # Trivy's fs scan resolves the full pom.xml dependency tree against Maven Central to
+      # check versions for known CVEs. Without a warm ~/.m2 cache this job's fresh runner hits
+      # Maven Central cold on every run and gets 429 Too Many Requests under shared GitHub-hosted
+      # runner IP pool load, which fails the whole job in seconds before any real scan happens.
+      # setup-java's cache: maven restores the same cache backend-build already populated (same
+      # pom.xml hash); this explicit resolve is the fallback trivy's own error message recommends.
+      - name: Populate Maven cache for dependency scanning
+        working-directory: ./backend
+        run: ./mvnw dependency:resolve -B -q
       # Maintained GitHub Action pinned to a specific release, instead of the previous
       # `curl https://.../main/contrib/install.sh | sh` (fetched from a mutable branch with no
       # checksum verification). Report step never fails the job, so the SARIF upload always runs
