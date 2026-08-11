@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -43,23 +45,28 @@ public class Ticket extends BaseEntity {
     private String description;
     
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "type", nullable = false, length = 20)
     private TicketType type;
-    
+
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private TicketStatus status = TicketStatus.NEW;
-    
+
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "severity", nullable = false, length = 20)
     private Severity severity;
-    
+
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "impact", nullable = false, length = 20)
     private Impact impact;
-    
+
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "priority", nullable = false, length = 20)
     private Priority priority;
     
@@ -208,6 +215,7 @@ public class Ticket extends BaseEntity {
     private String resolutionNextRecommendation;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "waiting_on", length = 20)
     private WaitingOn waitingOn;
 

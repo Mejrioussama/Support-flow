@@ -5,6 +5,8 @@ import com.supportflow.entity.enums.EscalationTrigger;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Événement d'escalade — traçabilité complète de chaque escalade.
@@ -33,10 +35,12 @@ public class EscalationEvent extends BaseEntity {
     private Integer toLevel;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "reason", nullable = false, length = 30)
     private EscalationReason reason;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "triggered_by", nullable = false, length = 10)
     private EscalationTrigger triggeredBy;
 

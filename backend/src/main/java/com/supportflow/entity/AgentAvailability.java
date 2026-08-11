@@ -4,6 +4,8 @@ import com.supportflow.entity.enums.AgentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -27,6 +29,7 @@ public class AgentAvailability extends BaseEntity {
     private User agent;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 15)
     @Builder.Default
     private AgentStatus status = AgentStatus.AVAILABLE;

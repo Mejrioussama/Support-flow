@@ -5,6 +5,8 @@ import com.supportflow.entity.enums.TicketHistoryAction;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Entité Historique des modifications du ticket
@@ -22,6 +24,7 @@ import lombok.experimental.SuperBuilder;
 public class TicketHistory extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "action", nullable = false, length = 50)
     private TicketHistoryAction action;
 
@@ -48,6 +51,7 @@ public class TicketHistory extends BaseEntity {
     private String userAgent;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "change_type", length = 20)
     private ChangeType changeType;
     
