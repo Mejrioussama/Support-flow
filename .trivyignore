@@ -1,0 +1,23 @@
+# Trivy accepted-risk list.
+#
+# The CI gate (.github/workflows/ci-cd.yml -> "Security Scan") fails the build on CRITICAL
+# findings. Everything listed here is a CRITICAL that has no fix available on the dependency
+# line this project is on, with the reasoning recorded so the decision can be re-checked later
+# rather than silently inherited.
+#
+# HIGH findings are intentionally NOT gated and NOT listed here - they still surface in the
+# SARIF report uploaded to the repository's Security tab. Most of them trace back to
+# Spring Boot 3.2.0 / Camunda 7.20.0 being a major version behind, which is a deliberate
+# post-defense upgrade rather than a patch-level fix.
+
+# CVE-2026-22732 - spring-security-web: HTTP response headers may not be written for servlet
+# applications, so configured security headers (CSP, X-Frame-Options, HSTS) can silently fail
+# to apply. That weakens defense-in-depth against clickjacking/XSS; it is not an authentication
+# or authorization bypass on its own.
+#
+# Not fixable here: the OSS fixes are 6.5.9 and 7.0.4. The 6.2.x line this project runs on
+# (pinned by spring-boot-starter-parent 3.2.0) ended OSS support at 6.2.8, which is already
+# applied in backend/pom.xml; 6.3.15 / 6.4.15 are Enterprise Support-only releases. Reaching
+# 6.5.9 means Spring Boot 3.2 -> 3.5, which in turn requires a Camunda 7.20 -> 7.23+ upgrade.
+# That upgrade chain is tracked as post-freeze work, not a patch.
+CVE-2026-22732
