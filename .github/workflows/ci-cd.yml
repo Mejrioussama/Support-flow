@@ -261,7 +261,7 @@ jobs:
       # pom.xml hash); this explicit resolve is the fallback trivy's own error message recommends.
       - name: Populate Maven cache for dependency scanning
         working-directory: ./backend
-        run: ./mvnw dependency:resolve -B -q
+        run: mvn dependency:resolve -B -q
       # Maintained GitHub Action pinned to a specific release, instead of the previous
       # `curl https://.../main/contrib/install.sh | sh` (fetched from a mutable branch with no
       # checksum verification). Report step never fails the job, so the SARIF upload always runs
