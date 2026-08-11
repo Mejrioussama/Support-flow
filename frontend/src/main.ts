@@ -2,9 +2,9 @@ import { APP_INITIALIZER, enableProdMode, importProvidersFrom } from '@angular/c
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
-import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptors, withInterceptorsFromDi } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
-import { KeycloakAngularModule, KeycloakBearerInterceptor, KeycloakService } from 'keycloak-angular';
+import { KeycloakAngularModule, KeycloakService } from 'keycloak-angular';
 
 import { AppComponent } from './app/app.component';
 import { routes } from './app/app.routes';
@@ -12,12 +12,31 @@ import { environment } from './environments/environment';
 import { authTokenInterceptor } from './app/core/interceptors/auth-token.interceptor';
 import { errorInterceptor } from './app/core/interceptors/error.interceptor';
 
+type SupportFlowRuntimeConfig = {
+  apiUrl?: string;
+  websocketUrl?: string;
+  keycloakUrl?: string;
+  alfrescoShareUrl?: string;
+};
+
+const runtimeConfig = (window as typeof window & {
+  __SUPPORTFLOW_CONFIG__?: SupportFlowRuntimeConfig;
+}).__SUPPORTFLOW_CONFIG__ ?? {};
+
+if (runtimeConfig.apiUrl) environment.apiUrl = runtimeConfig.apiUrl;
+if (runtimeConfig.websocketUrl) environment.websocket.url = runtimeConfig.websocketUrl;
+if (runtimeConfig.keycloakUrl) environment.keycloak.url = runtimeConfig.keycloakUrl;
+if (runtimeConfig.alfrescoShareUrl) environment.alfresco.shareUrl = runtimeConfig.alfrescoShareUrl;
+
 // Some browser-only dependencies still probe for the Node global object.
 // Define it before Angular bootstraps to avoid runtime crashes in dev.
 (window as typeof window & { global?: Window }).global = window;
 
 const KEYCLOAK_BOOT_RETRIES = 4;
 const KEYCLOAK_RETRY_DELAY_MS = 3000;
+const isClusterLocalRuntime = window.location.port === '30088';
+const isLocalRuntime = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const shouldEnableServiceWorker = environment.production && !isLocalRuntime;
 
 const keycloakBootstrapOptions = {
   config: {
@@ -26,8 +45,10 @@ const keycloakBootstrapOptions = {
     clientId: environment.keycloak.clientId
   },
   initOptions: {
-    onLoad: 'check-sso' as const,
-    silentCheckSsoRedirectUri: window.location.origin + '/assets/silent-check-sso.html',
+    onLoad: (isClusterLocalRuntime ? 'login-required' : 'check-sso') as 'login-required' | 'check-sso',
+    silentCheckSsoRedirectUri: isClusterLocalRuntime
+      ? undefined
+      : window.location.origin + '/assets/silent-check-sso.html',
     checkLoginIframe: false,
     pkceMethod: 'S256' as const
   },
@@ -102,33 +123,47 @@ function initializeKeycloak(keycloak: KeycloakService) {
   };
 }
 
+async function clearLocalServiceWorkers(): Promise<void> {
+  if (!('serviceWorker' in navigator) || !isLocalRuntime) {
+    return;
+  }
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  } catch (error) {
+    logKeycloakWarning('Unable to clear local service workers:', error);
+  }
+}
+
 if (environment.production) {
   enableProdMode();
 }
 
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideAnimations(),
-    provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([authTokenInterceptor, errorInterceptor]), withInterceptorsFromDi()),
-    importProvidersFrom(KeycloakAngularModule),
-    {
-      provide: HTTP_INTERCEPTORS,
-      useClass: KeycloakBearerInterceptor,
-      multi: true
-    },
-    {
-      provide: APP_INITIALIZER,
-      useFactory: initializeKeycloak,
-      multi: true,
-      deps: [KeycloakService]
-    },
-    provideServiceWorker('ngsw-worker.js', {
-      enabled: environment.production,
-      registrationStrategy: 'registerWhenStable:30000'
-    })
-  ]
-}).catch(err => {
+async function bootstrap(): Promise<void> {
+  await clearLocalServiceWorkers();
+
+  await bootstrapApplication(AppComponent, {
+    providers: [
+      provideAnimations(),
+      provideRouter(routes, withComponentInputBinding()),
+      provideHttpClient(withInterceptors([authTokenInterceptor, errorInterceptor])),
+      importProvidersFrom(KeycloakAngularModule),
+      {
+        provide: APP_INITIALIZER,
+        useFactory: initializeKeycloak,
+        multi: true,
+        deps: [KeycloakService]
+      },
+      provideServiceWorker('ngsw-worker.js', {
+        enabled: shouldEnableServiceWorker,
+        registrationStrategy: 'registerWhenStable:30000'
+      })
+    ]
+  });
+}
+
+bootstrap().catch(err => {
   console.error(err);
   const body = document.body;
   if (body) {

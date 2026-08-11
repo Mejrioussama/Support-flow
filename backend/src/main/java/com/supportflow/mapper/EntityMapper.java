@@ -2,6 +2,8 @@ package com.supportflow.mapper;
 
 import com.supportflow.dto.*;
 import com.supportflow.entity.*;
+import com.supportflow.repository.AttachmentRepository;
+import com.supportflow.repository.CommentRepository;
 import com.supportflow.service.SlaComputationService;
 import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,12 @@ public abstract class EntityMapper {
 
     @Autowired
     protected SlaComputationService slaComputationService;
+
+    @Autowired
+    protected CommentRepository commentRepository;
+
+    @Autowired
+    protected AttachmentRepository attachmentRepository;
     
     // User mappings
     @Mapping(target = "fullName", expression = "java(user.getFullName())")
@@ -57,8 +65,8 @@ public abstract class EntityMapper {
     @Mapping(target = "createdByUser", source = "createdByUser")
     @Mapping(target = "assignedAgent", source = "assignedAgent")
     @Mapping(target = "formattedResolutionTime", expression = "java(ticket.getFormattedResolutionTime())")
-    @Mapping(target = "commentsCount", expression = "java(ticket.getComments().size())")
-    @Mapping(target = "attachmentsCount", expression = "java(ticket.getAttachments().size())")
+    @Mapping(target = "commentsCount", expression = "java(countComments(ticket))")
+    @Mapping(target = "attachmentsCount", expression = "java(countAttachments(ticket))")
     @Mapping(target = "slaBreached", expression = "java(slaComputationService.isBreached(ticket))")
     @Mapping(target = "slaState", expression = "java(resolveSlaState(ticket))")
     @Mapping(target = "slaActionRequired", expression = "java(resolveSlaActionRequired(ticket))")
@@ -166,6 +174,26 @@ public abstract class EntityMapper {
 
     public Boolean isArchived(Ticket ticket) {
         return ticket.getAlfrescoFolderId() != null && !ticket.getAlfrescoFolderId().isBlank();
+    }
+
+    /**
+     * Uses a COUNT query instead of ticket.getComments().size(): the comments/attachments
+     * collections are LAZY, so calling .size() on them forces Hibernate to fetch and hydrate
+     * every row just to report a number, turning every ticket list/search page into an N+1
+     * query storm (2 extra full-collection SELECTs per ticket).
+     */
+    public int countComments(Ticket ticket) {
+        if (ticket == null || ticket.getId() == null) {
+            return 0;
+        }
+        return (int) commentRepository.countByTicketId(ticket.getId());
+    }
+
+    public int countAttachments(Ticket ticket) {
+        if (ticket == null || ticket.getId() == null) {
+            return 0;
+        }
+        return (int) attachmentRepository.countByTicketId(ticket.getId());
     }
 
     public String formatSlaRemaining(Ticket ticket) {

@@ -20,6 +20,17 @@
     
     <properties>
         <java.version>17</java.version>
+        <!--
+          Security patch overrides for versions managed by spring-boot-starter-parent 3.2.0.
+          Both stay inside the same minor line the parent already ships (Tomcat 10.1.x,
+          Spring Security 6.2.x), so this is a patch-level bump, not a framework upgrade.
+          Tomcat 10.1.16 -> 10.1.55 clears CVE-2025-24813, CVE-2026-41293, CVE-2026-43512 and
+          CVE-2026-43515 (all CRITICAL) plus a long tail of HIGH findings.
+          Spring Security 6.2.0 -> 6.2.8 clears CVE-2024-38821 (CRITICAL), CVE-2024-22234 and
+          CVE-2024-22257. 6.2.8 is the last OSS release on the 6.2 line.
+        -->
+        <tomcat.version>10.1.55</tomcat.version>
+        <spring-security.version>6.2.8</spring-security.version>
         <camunda.version>7.20.0</camunda.version>
         <keycloak.version>23.0.1</keycloak.version>
         <springdoc.version>2.3.0</springdoc.version>
@@ -80,6 +91,16 @@
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
         </dependency>
         
         <!-- H2 Database for testing -->
@@ -174,6 +195,21 @@
             <groupId>org.apache.chemistry.opencmis</groupId>
             <artifactId>chemistry-opencmis-client-impl</artifactId>
             <version>1.1.0</version>
+            <!--
+              OpenCMIS 1.1.0 drags in Apache CXF 3.0.12 (2016) purely to support the CMIS
+              Web Services (SOAP) binding. AlfrescoCmisService connects with
+              BindingType.ATOMPUB, so none of that code path is ever reached, but the jars
+              still land on the classpath and carry CVE-2022-46364 (CRITICAL SSRF) plus
+              several HIGH findings, and pull in org.apache.neethi with two more.
+              Excluding the whole CXF group removes the vulnerable surface without touching
+              the AtomPub binding we actually use.
+            -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.cxf</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         
         <!-- Lombok -->
@@ -244,6 +280,12 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>5.1.0.4751</version>
             </plugin>
         </plugins>
     </build>

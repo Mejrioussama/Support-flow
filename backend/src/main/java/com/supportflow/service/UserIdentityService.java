@@ -44,14 +44,25 @@ public class UserIdentityService {
             }
         }
 
-        if (email != null) {
+        // Auto-linking an unlinked local User record by email/username match is only safe when
+        // the identity claim is verified: Keycloak's self-registration flow (registrationAllowed)
+        // lets a caller pick any email/username with no ownership check, since duplicateEmailsAllowed
+        // only prevents collisions within Keycloak's own store, not against SupportFlow's local
+        // "users" table. Without this gate, an attacker could self-register with an existing
+        // staff member's email and silently inherit that member's local account/role on first
+        // login. Accounts provisioned through KeycloakAdminService (the legitimate admin path)
+        // are always created with emailVerified=true, so this does not affect normal staff
+        // provisioning - only unverified, self-registered identities are excluded from linking.
+        boolean jwtEmailVerified = Boolean.TRUE.equals(jwt.getClaimAsBoolean("email_verified"));
+
+        if (email != null && jwtEmailVerified) {
             var byEmail = userRepository.findByEmail(email);
             if (byEmail.isPresent()) {
                 return attachKeycloakIdIfMissing(byEmail.get(), keycloakId);
             }
         }
 
-        if (preferredUsername != null) {
+        if (preferredUsername != null && jwtEmailVerified) {
             var byUsername = userRepository.findByUsername(preferredUsername);
             if (byUsername.isPresent()) {
                 return attachKeycloakIdIfMissing(byUsername.get(), keycloakId);
@@ -66,15 +77,16 @@ public class UserIdentityService {
         String keycloakUsername = getString(keycloakUser, "username");
         String keycloakFirstName = getString(keycloakUser, "firstName");
         String keycloakLastName = getString(keycloakUser, "lastName");
+        boolean keycloakEmailVerified = keycloakUser != null && Boolean.TRUE.equals(keycloakUser.get("emailVerified"));
 
-        if (keycloakEmail != null) {
+        if (keycloakEmail != null && keycloakEmailVerified) {
             var byEmail = userRepository.findByEmail(keycloakEmail);
             if (byEmail.isPresent()) {
                 return attachKeycloakIdIfMissing(byEmail.get(), keycloakId);
             }
         }
 
-        if (keycloakUsername != null) {
+        if (keycloakUsername != null && keycloakEmailVerified) {
             var byUsername = userRepository.findByUsername(keycloakUsername);
             if (byUsername.isPresent()) {
                 return attachKeycloakIdIfMissing(byUsername.get(), keycloakId);

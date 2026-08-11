@@ -109,7 +109,7 @@ export class TicketService {
     );
   }
 
-  createTicket(ticket: any): Observable<Ticket> {
+  createTicket(ticket: TicketCreate): Observable<Ticket> {
     return this.http.post<Ticket>(this.apiUrl, ticket).pipe(
       map(created => this.normalizeTicket(created))
     );

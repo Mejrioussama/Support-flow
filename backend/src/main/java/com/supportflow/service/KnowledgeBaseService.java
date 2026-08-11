@@ -18,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityNotFoundException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -222,6 +223,22 @@ public class KnowledgeBaseService {
     }
 
     private KnowledgeArticleDTO toDTO(KnowledgeArticle article) {
+        Long sourceTicketId = null;
+        String sourceTicketReference = null;
+
+        try {
+            if (article.getSourceTicket() != null) {
+                sourceTicketId = article.getSourceTicket().getId();
+                sourceTicketReference = article.getSourceTicket().getReference();
+
+                if (sourceTicketReference == null) {
+                    log.warn("Article KB {} reference un ticket source introuvable: {}", article.getId(), sourceTicketId);
+                }
+            }
+        } catch (EntityNotFoundException ex) {
+            log.warn("Article KB {} reference un ticket source supprime ou invalide", article.getId(), ex);
+        }
+
         return KnowledgeArticleDTO.builder()
             .id(article.getId())
             .title(article.getTitle())
@@ -234,8 +251,8 @@ public class KnowledgeBaseService {
             .notHelpfulCount(article.getNotHelpfulCount())
             .isPublished(article.getIsPublished())
             .authorName(article.getAuthor() != null ? article.getAuthor().getFullName() : null)
-            .sourceTicketId(article.getSourceTicket() != null ? article.getSourceTicket().getId() : null)
-            .sourceTicketReference(article.getSourceTicket() != null ? article.getSourceTicket().getReference() : null)
+            .sourceTicketId(sourceTicketId)
+            .sourceTicketReference(sourceTicketReference)
             .createdAt(article.getCreatedAt())
             .updatedAt(article.getUpdatedAt())
             .build();

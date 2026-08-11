@@ -27,9 +27,23 @@ Le workflow `.github/workflows/ci-cd.yml` execute:
 - aucun secret ArgoCD requis en mode auto-sync
 
 ### Secrets cluster / runtime
-- `supportflow-secrets`
+- `supportflow-secrets` doit etre cree dans le cluster avant le deploiement; aucun secret reel n'est versionne.
 - secrets base de donnees
 - secrets JWT / Keycloak / Alfresco si externalises
+
+Exemple de creation (remplacer toutes les valeurs):
+
+```bash
+kubectl -n supportflow create secret generic supportflow-secrets \
+  --from-literal=DB_USERNAME=supportflow \
+  --from-literal=DB_PASSWORD='<random>' \
+  --from-literal=MYSQL_ROOT_PASSWORD='<random>' \
+  --from-literal=JWT_SECRET='<random-32+-chars>' \
+  --from-literal=ALFRESCO_USERNAME='<user>' \
+  --from-literal=ALFRESCO_PASSWORD='<random>'
+```
+
+Le fichier `k8s/base/app-secrets.example.yaml` documente uniquement les cles requises et n'est pas inclus par Kustomize.
 
 ## 5. Mapping des environnements
 - branche `develop` -> overlay `staging`
@@ -62,3 +76,7 @@ Le workflow `.github/workflows/ci-cd.yml` execute:
   `github.repository_owner`.
 - Les services lourds externes comme Keycloak et Alfresco peuvent rester hors cluster pour la soutenance si
   l architecture et la preuve de connectivite sont documentees.
+- Dans ce cas, chaque overlay doit surcharger `KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWK_URI`, `ALFRESCO_URL`
+  et `AI_AGENT_URL` avec les adresses effectivement joignables depuis les pods.
+- Les URL visibles par le navigateur sont injectees sans rebuild par le ConfigMap
+  `supportflow-frontend-runtime`. Remplacer les domaines d'exemple dans chaque overlay avant deploiement.

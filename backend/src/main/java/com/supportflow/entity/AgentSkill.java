@@ -16,6 +16,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Explicit skill attached to a support user.
@@ -42,6 +44,7 @@ public class AgentSkill extends BaseEntity {
     private SupportCategory category;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "skill_type", nullable = false, length = 20)
     private AgentSkillType skillType;
 }

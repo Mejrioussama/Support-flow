@@ -11,6 +11,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -18,8 +20,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -51,12 +56,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 
-                UsernamePasswordAuthenticationToken authentication = 
-                    new UsernamePasswordAuthenticationToken(
-                        userDetails, 
-                        null, 
-                        authorities
-                    );
+                var claims = tokenProvider.getClaimsFromToken(jwt);
+                Map<String, Object> jwtClaims = new HashMap<>(claims);
+                jwtClaims.putIfAbsent("preferred_username", username);
+                Instant issuedAt = claims.getIssuedAt() != null ? claims.getIssuedAt().toInstant() : Instant.now();
+                Instant expiresAt = claims.getExpiration() != null ? claims.getExpiration().toInstant() : issuedAt.plusSeconds(3600);
+                Jwt principal = new Jwt(jwt, issuedAt, expiresAt, Map.of("alg", "HS256"), jwtClaims);
+                JwtAuthenticationToken authentication = new JwtAuthenticationToken(principal, authorities, username);
                 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 

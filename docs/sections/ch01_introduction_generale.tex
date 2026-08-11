@@ -1,0 +1,81 @@
+\chapter{Introduction generale}
+
+\section{Contexte du stage}
+
+La transformation numerique des organisations s'accompagne d'une augmentation continue des demandes de support, qu'elles concernent des incidents de production, des demandes d'acces, des anomalies applicatives, des questions fonctionnelles ou des besoins d'assistance lies a l'exploitation quotidienne des outils numeriques. Dans de nombreuses structures, ces demandes circulent encore par des canaux heterogenes comme l'email, la messagerie instantanee, le telephone ou des fichiers de suivi manuels. Cette dispersion rend la gestion du support difficile a piloter et fragilise la qualite de service.
+
+Le stage s'inscrit dans ce contexte. Il porte sur la conception, la structuration et la stabilisation d'une solution appelee \textbf{SupportFlow}, pensee comme une plateforme unifiee de gestion des tickets. L'ambition du projet n'est pas seulement de centraliser les demandes, mais de construire un systeme metier capable d'orchestrer les flux de traitement, d'encadrer les roles, de surveiller les delais de resolution, d'archiver les preuves documentaires et d'assister les utilisateurs grace a l'intelligence artificielle.
+
+\section{Presentation du sujet}
+
+Le sujet consiste a mettre en place une application complete couvrant les besoins d'un centre de support moderne. L'application doit permettre a un client de creer un ticket, a un manager de superviser la file de traitement, a un agent de prendre en charge et de resoudre les demandes, et a un administrateur de controler la plateforme. Cette logique multi-profils impose une gestion fine des autorisations, une lisibilite forte des etats metier et une architecture capable de faire communiquer plusieurs briques techniques.
+
+SupportFlow articule ainsi plusieurs dimensions :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item une dimension \textbf{fonctionnelle}, car le ticket suit un cycle de vie metier clairement defini ;
+  \item une dimension \textbf{organisationnelle}, car plusieurs acteurs cooperent selon des droits differencies ;
+  \item une dimension \textbf{technique}, car le projet integre frontend, backend, moteur BPMN, GED, IAM, IA et deploiement ;
+  \item une dimension \textbf{qualite}, car la plateforme doit etre demonstrable, testable, monitorable et exploitable.
+\end{itemize}
+
+\section{Problematique}
+
+La problematique generale du stage peut etre formulee de la maniere suivante : \textit{comment concevoir et consolider une plateforme de support capable de structurer le traitement des tickets, de garantir la securite des acces, d'automatiser les transitions critiques, d'ameliorer la supervision manageriale et d'integrer des fonctions d'assistance intelligente, tout en restant demonstrable et maintenable ?}
+
+Cette problematique se decline en plusieurs questions plus precises :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item comment representer correctement le cycle de vie d'un ticket et ses transitions sensibles ;
+  \item comment faire converger les besoins du client, de l'agent, du manager et de l'administrateur dans une meme plateforme ;
+  \item comment surveiller les delais SLA et detecter les situations a risque avant le depassement ;
+  \item comment integrer un moteur de workflow et des notifications temps reel sans complexifier l'usage ;
+  \item comment capitaliser les documents et les rapports produits autour des tickets ;
+  \item comment introduire l'IA de facon utile, robuste et non bloquante pour le coeur metier.
+\end{itemize}
+
+\section{Objectifs du stage}
+
+Le stage poursuit plusieurs objectifs complementaires. Le premier est de fournir une \textbf{solution applicative complete} couvrant les besoins essentiels du support. Le deuxieme est d'obtenir une \textbf{coherence metier} entre les ecrans, les roles, les APIs, les workflows et les regles d'autorisation. Le troisieme est de mettre en place une \textbf{chaine technique credible} allant de la qualite logicielle au deploiement GitOps. Enfin, le quatrieme objectif est de produire un travail suffisamment mature pour etre defendu dans un cadre academique et professionnel.
+
+De maniere plus concrete, le projet devait aboutir a :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item un portail ticketing exploitable par plusieurs profils ;
+  \item un backend riche en logique metier et expose via des APIs REST coherentes ;
+  \item une orchestration BPMN avec Camunda pour les etapes critiques du cycle ticket ;
+  \item une authentification et des autorisations centralisees avec Keycloak ;
+  \item un archivage documentaire via Alfresco ;
+  \item des rapports PDF et Excel et des indicateurs de supervision ;
+  \item une chaine de validation comprenant build, analyse qualite, scan securite et deploiement GitOps ;
+  \item une documentation suffisante pour la soutenance et la reprise du projet.
+\end{itemize}
+
+\section{Demarche generale adoptee}
+
+Le travail n'a pas ete mene comme une simple succession de developpements isoles. La demarche retenue a ete iterative. Elle a consiste a construire un socle fonctionnel, a enrichir progressivement la profondeur metier, puis a corriger les incoherences revelees par les tests, les scenarios de demonstration et les retours d'usage. Ce mode de travail est particulierement adapte a un projet comme SupportFlow, dans lequel chaque evolution touche plusieurs couches : interface, API, securite, workflow, donnees et services transverses.
+
+La logique generale a donc ete la suivante :
+
+\begin{enumerate}[leftmargin=1.2cm]
+  \item poser les briques structurantes du systeme ;
+  \item modeliser les acteurs, les besoins et les parcours principaux ;
+  \item mettre en place l'architecture technique et la base metier ;
+  \item enrichir la solution avec la supervision, l'IA, la GED et le reporting ;
+  \item corriger les points de friction les plus visibles ;
+  \item preparer une chaine de preuve complete pour la soutenance.
+\end{enumerate}
+
+\section{Interet academique et professionnel}
+
+L'interet academique du projet est fort, car il mobilise de nombreuses competences complementaires : analyse des besoins, modelisation metier, developpement full stack, securite applicative, orchestration de processus, qualite logicielle, conteneurisation, integration continue, GitOps et assistance intelligente. Il permet aussi d'etudier la difference entre une application demonstrative simple et un systeme metier coherent, capable de supporter des roles, des delais, des traces, des documents et des scenarios reels.
+
+D'un point de vue professionnel, SupportFlow repond a un besoin concret et recurrent. Une organisation qui maitrise mal son support perd du temps, de la tracabilite, de la qualite de service et de la capacite de capitalisation. Le projet traite donc un probleme reel, observable et economiquement important.
+
+\section{Structure du rapport}
+
+Le present rapport est organise en dix chapitres. Le premier introduit le contexte, le sujet, la problematique et la demarche generale. Le deuxieme presente l'entreprise d'accueil, le cadre du stage, la mission confiee et le role de l'etudiant. Le troisieme revient sur l'existant et reformule la problematique de maniere plus ciblee. Le quatrieme detaille l'analyse des besoins fonctionnels et non fonctionnels.
+
+Le cinquieme chapitre expose la methodologie de conduite du projet, le planning, les difficultes rencontrees et les ajustements effectues. Le sixieme presente la conception generale de la solution, son architecture et son modele de donnees. Le septieme est consacre a la realisation technique. Le huitieme traite des tests, de la validation et des resultats observes. Le neuvieme propose une analyse critique des acquis, des limites et des perspectives. Enfin, le dixieme conclut le travail et synthetise la valeur globale du projet.
+
+Des annexes viennent completer le corps principal avec des inventaires techniques, des scenarios de tests, des tableaux de permissions, des elements Docker et des details utiles a la reprise du projet sans alourdir excessivement la lecture principale.

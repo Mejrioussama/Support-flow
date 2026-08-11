@@ -18,9 +18,13 @@ export class AuthGuard extends KeycloakAuthGuard {
     state: RouterStateSnapshot
   ): Promise<boolean | UrlTree> {
     if (!this.authenticated) {
-      if (state.url !== '/') {
-        return this.router.parseUrl('/');
-      }
+      // Don't auto-trigger Keycloak's hosted login page here: that fires a full browser
+      // redirect off the SPA the instant an unauthenticated visitor hits any guarded route
+      // (including the default '' -> 'dashboard' redirect on first load), so the app's own
+      // login screen (AppComponent's "Authentification" / "Creer un compte" buttons) never
+      // gets a chance to render. Just deny the route instead; AppComponent already shows its
+      // login screen whenever the user isn't logged in, and its own login()/register()
+      // buttons are the only things that should call keycloak.login().
       return false;
     }
 

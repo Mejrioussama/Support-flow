@@ -1,0 +1,428 @@
+﻿\chapter{Realisation technique}
+
+\section{Organisation en couches}
+
+Le backend est structure autour d'une architecture en couches assez classique, mais bien adaptee au domaine. Les controllers exposent les endpoints. Les services encapsulent les regles metier. Les repositories accedent aux entites JPA. Les DTO protegent les contrats d'echange. Les mappers assurent les conversions. Cette structure simplifie la maintenance et facilite l'extension du projet.
+
+\section{Controllers recenses}
+
+Le backend contient seize controllers, chacun rattache a un sous-domaine metier ou technique.
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{AgentWorkloadController}
+  \item \texttt{AIAssistantController}
+  \item \texttt{AttachmentController}
+  \item \texttt{AuthController}
+  \item \texttt{CamundaController}
+  \item \texttt{ClientController}
+  \item \texttt{CommentController}
+  \item \texttt{DashboardController}
+  \item \texttt{EscalationPolicyController}
+  \item \texttt{KnowledgeBaseController}
+  \item \texttt{NotificationController}
+  \item \texttt{ReportController}
+  \item \texttt{SatisfactionController}
+  \item \texttt{SupportCategoryController}
+  \item \texttt{TicketController}
+  \item \texttt{UserController}
+\end{itemize}
+
+Cette granularite montre que le domaine a ete decoupe de maniere raisonnable. Les responsabilites ne sont pas toutes concentrees dans un unique point d'entree.
+
+\section{Services metiers}
+
+Le backend recense vingt-quatre services principaux. Leur existence montre que les besoins ont ete separes par domaine fonctionnel et non traites dans des controllers trop lourds.
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{AgentSkillService}
+  \item \texttt{AgentWorkloadService}
+  \item \texttt{AlfrescoArchiveService}
+  \item \texttt{AlfrescoCmisService}
+  \item \texttt{AttachmentService}
+  \item \texttt{BusinessHoursService}
+  \item \texttt{CamundaAsyncService}
+  \item \texttt{CamundaBootstrapService}
+  \item \texttt{CamundaService}
+  \item \texttt{ClientService}
+  \item \texttt{CommentService}
+  \item \texttt{DashboardService}
+  \item \texttt{EscalationService}
+  \item \texttt{KeycloakAdminService}
+  \item \texttt{KnowledgeBaseService}
+  \item \texttt{NotificationService}
+  \item \texttt{ReportService}
+  \item \texttt{SatisfactionService}
+  \item \texttt{SlaTimerService}
+  \item \texttt{SupportCategoryService}
+  \item \texttt{TicketAutomationService}
+  \item \texttt{TicketService}
+  \item \texttt{UserIdentityService}
+  \item \texttt{UserService}
+\end{itemize}
+
+\section{TicketService comme coeur metier}
+
+Le service le plus central est naturellement \texttt{TicketService}. Il orchestre la creation, l'edition, l'assignation, la resolution, la cloture et certaines transitions associees au workflow. C'est aussi lui qui dialogue avec d'autres briques comme l'escalade, les notifications, le SLA et Camunda.
+
+L'une des qualites observees est que le service ne se contente pas de manipuler l'entite ticket de maniere naive. Il porte une veritable logique de garde-fous. Par exemple, certaines corrections recentes ont interdit l'assignation d'un ticket deja finalise. Ce type de regle est essentiel pour garantir l'integrite metier.
+
+\section{EscalationService et aide a l'assignation}
+
+\texttt{EscalationService} gere un aspect plus fin du domaine : la logique d'escalade et la production de listes de candidats a l'assignation. L'evolution recente du projet a permis de faire apparaitre non seulement les candidats eligibles, mais aussi les candidats non eligibles avec leur raison. Cette approche est tres utile d'un point de vue metier, car elle rend les decisions plus transparentes. Au lieu de faire disparaitre des profils de la liste, on montre qu'ils existent mais qu'ils sont indisponibles, deja assignes, en pause ou en capacite saturee.
+
+\section{Services Camunda}
+
+Le backend s'appuie sur plusieurs services Camunda. \texttt{CamundaService} assure l'integration principale. \texttt{CamundaAsyncService} permet de sortir du chemin critique certaines operations susceptibles de ralentir les reponses HTTP. \texttt{CamundaBootstrapService} joue un role particulier : il resynchronise ou rehydrate les workflows au demarrage, ce qui est tres utile lorsqu'un jeu de donnees est injecte directement en base et que les processus Camunda n'ont pas encore ete crees.
+
+Cette derniere brique a une forte valeur pratique. Dans un contexte de demonstration, il est frequent de recharger des donnees de test sans repasser par toutes les API metier. Sans bootstrap de workflow, Camunda et la base divergeraient. La presence de ce mecanisme renforce donc la coherence globale du systeme.
+
+\section{Services documentaires et reporting}
+
+La couche documentaire est repartie entre trois services complementaires :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \code{AlfrescoCmisService} pour la communication CMIS ;
+  \item \code{AlfrescoArchiveService} pour la logique d'archivage ;
+  \item \code{ReportService} pour la generation de rapports.
+\end{itemize}
+
+Cette separation est judicieuse. Elle evite de melanger logique documentaire, logique d'export et logique metier pure.
+
+\section{DTO, mapping et contrats API}
+
+Le projet emploie des DTO pour encapsuler les donnees exposees au frontend. Ce choix est pertinent pour plusieurs raisons. Il permet d'eviter d'exposer directement les entites JPA, de maitriser les champs transmis, de faire evoluer l'API plus sereinement et de ne pas coupler trop fortement la persistance avec la presentation. MapStruct est utilise pour certains mappages, ce qui reduit le bruit de code repetitif.
+
+\section{Gestion des erreurs et robustesse}
+
+Le backend contient un package \texttt{exception} et renvoie des erreurs semantiques. Au cours des corrections recentes, plusieurs erreurs visibles dans l'interface ont ete traitees pour devenir soit de vraies erreurs comprehensibles, soit des fallback plus robustes. L'exemple de l'outil IA sur ticket est representatif : auparavant, la saisie d'une reference de type \texttt{1013} pouvait etre comprise comme un ID inexistant et provoquer un \texttt{500}. Desormais, le frontend est capable de resoudre une reference ou un ID avant d'appeler l'endpoint adequat.
+
+\section{Observations globales sur le backend}
+
+Le backend de SupportFlow donne l'image d'un projet qui a cherche a traiter de vrais sujets d'entreprise : workflow, SLA, reporting, GED, IAM, IA. Cette richesse implique inevitablement des zones de complexite, mais l'organisation generale du code reste lisible. Le point d'attention principal est la synchronisation continue entre la logique metier, les autorisations et l'interface, ce qui fait justement partie des chantiers recents les plus importants.
+
+
+
+\section{Frontend et experience utilisateur}
+
+\section{Role du frontend dans le projet}
+
+Le frontend Angular joue un role bien plus large qu'un simple client HTTP. Il constitue la vitrine du projet, l'espace de travail des utilisateurs et le lieu ou la coherence metier devient visible. Un bon backend ne suffit pas si l'interface laisse apparaitre des actions non autorisees, des informations contradictoires ou des etats difficiles a comprendre. L'une des forces de SupportFlow est d'avoir progressivement rapproche le frontend de la realite des permissions et des transitions metier.
+
+\section{Structure frontend}
+
+Le frontend se compose d'un socle \texttt{core} et d'un ensemble de modules \texttt{features}. Cette structure est saine. Le \texttt{core} regroupe les services transverses, les modeles, l'authentification et les acces aux APIs. Les \texttt{features} regroupent les ecrans utilisateurs selon le domaine metier.
+
+\section{Modules fonctionnels identifies}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{dashboard}
+  \item \texttt{tickets}
+  \item \texttt{clients}
+  \item \texttt{users}
+  \item \texttt{profile}
+  \item \texttt{archives-reports}
+  \item \texttt{ai-assistant}
+\end{itemize}
+
+\section{Services frontend}
+
+Les services frontend jouent le role d'adaptateurs entre l'interface et l'API :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{auth.service.ts}
+  \item \texttt{ticket.service.ts}
+  \item \texttt{client.service.ts}
+  \item \texttt{user.service.ts}
+  \item \texttt{dashboard.service.ts}
+  \item \texttt{notification.service.ts}
+  \item \texttt{report.service.ts}
+  \item \texttt{ai.service.ts}
+  \item \texttt{websocket.service.ts}
+\end{itemize}
+
+\section{Experience utilisateur sur les tickets}
+
+Le domaine des tickets est naturellement le plus riche. La liste de tickets offre la vision d'ensemble. La fiche detail donne acces a l'ensemble des informations metier : statut, priorite, resume, SLA, actions, commentaires, pieces jointes, workflow et historique. L'ecran de creation concentre quant a lui les champs utiles a l'ouverture d'un dossier.
+
+Une partie importante du travail recent a consiste a clarifier les actions disponibles sur la fiche ticket. Les boutons \texttt{Assigner}, \texttt{Prendre le ticket}, \texttt{Resoudre}, \texttt{Escalader}, \texttt{Prolonger SLA}, \texttt{Revue manager}, \texttt{Archiver} ou \texttt{Reouvrir} doivent tous reposer sur une logique coherente. Si un agent non autorise voit un bouton actif qui lui sera ensuite refuse par le backend, l'outil perd en credibilite. Le recent alignement entre frontend et backend sur les autorisations est donc un progres majeur.
+
+\section{Ecran assistant IA}
+
+L'ecran \texttt{AI Assistant} montre l'ambition du projet. Il propose un chat, des outils par ticket et une analyse globale des tendances. Cet ecran centralise plusieurs types d'assistance : analyse, diagnostic, suggestion de reponse et resume d'escalade.
+
+Une correction recente a apporte une amelioration tres utile : l'utilisateur peut maintenant saisir soit un ID interne, soit une reference comme \texttt{SF-1013}, soit meme le suffixe numerique \texttt{1013}. L'interface resout ce format en amont avant de contacter l'API IA. Cela evite les erreurs inutiles et rapproche l'outil du langage naturel des utilisateurs.
+
+\section{Notifications et temps reel}
+
+Le frontend exploite un service WebSocket pour recevoir des notifications. Cette capacite renforce l'impression d'un vrai poste de supervision. Les alertes, notifs et badges visibles dans l'interface contribuent a rendre le systeme plus vivant. L'utilisateur ne travaille pas sur un simple ecran statique, mais sur une application qui reactualise ses informations.
+
+\section{Qualites et points d'attention du frontend}
+
+Le frontend offre deja une bonne couverture fonctionnelle et une identite visuelle forte. Les points de vigilance concernent surtout la clarte continue des parcours complexes, la gestion des erreurs, la prevention des ecrans de chargement trop longs et la coherente totale entre les informations affichees et les regles metier reelles. Les derniers correctifs montrent que ce sujet est bien pris en compte.
+
+
+
+\section{Securite, identite et autorisations}
+
+\section{Keycloak comme socle IAM}
+
+Le choix de Keycloak apporte une architecture de securite moderne. Le frontend delegue l'authentification au serveur IAM. Le backend verifie ensuite les jetons et en extrait les roles. Cette separation est saine car elle evite de reinventer une partie tres sensible du systeme.
+
+\section{Roles metiers}
+
+SupportFlow distingue quatre roles metiers principaux :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \code{ADMIN}
+  \item \code{SUPPORT\_MANAGER}
+  \item \code{SUPPORT\_AGENT}
+  \item \code{CLIENT}
+\end{itemize}
+
+Cette matrice n'est pas purement cosmetique. Elle structure les vues, les actions et les donnees accessibles.
+
+\section{AuthorizationHelper}
+
+Le fichier \texttt{AuthorizationHelper} illustre bien l'effort recent de centralisation des permissions. Il ne se contente pas de savoir si un utilisateur est manager ou agent. Il verifie aussi des permissions d'action contextualisees : assigner, prendre en charge, resoudre, escalader, gerer le SLA, demander une revue manager, cloturer, rejeter une resolution ou archiver.
+
+Cette approche est plus robuste qu'une simple logique de role brut. Elle combine role, identite courante, etat du ticket et rattachement effectif du ticket a l'utilisateur. C'est exactement ce qu'il faut pour un outil metier dans lequel une meme ressource ne doit pas etre traitable par tous de la meme facon.
+
+\section{Coherence frontend-backend}
+
+L'un des problemes les plus frequents dans les applications d'entreprise est l'ecart entre les autorisations calculees dans l'interface et celles appliquees cote serveur. SupportFlow a connu une phase de ce type, ce qui est normal dans un projet en croissance. Le recent travail d'alignement a justement vise a faire disparaitre les raccourcis trop permissifs dans le frontend, notamment la confusion entre staff et manager.
+
+\section{Protection des clients}
+
+Le role client merite une attention particuliere. Il doit pouvoir acceder a ses tickets sans obtenir une visibilite excessive sur les donnees du support. Les verifications de proprietes de ticket et de rattachement au client sont donc essentielles. Elles renforcent la separation entre espace client et espace interne.
+
+\section{Autorisations sensibles}
+
+Parmi les actions les plus sensibles :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item l'assignation ;
+  \item la reassignation ;
+  \item la resolution ;
+  \item la cloture ;
+  \item l'escalade ;
+  \item la gestion du SLA ;
+  \item l'archivage ;
+  \item l'acces aux commentaires internes.
+\end{itemize}
+
+Le fait que ces actions soient maintenant controlees plus explicitement constitue une nette amelioration de la qualite globale du projet.
+
+\section{Role de la securite dans la soutenance}
+
+Dans une soutenance ou un rapport de stage, la securite est souvent survolee. Or, dans SupportFlow, elle constitue un veritable axe de profondeur. Le projet montre que la gestion des roles ne sert pas seulement a cacher ou afficher des menus, mais qu'elle conditionne la validite metier des actions possibles.
+
+
+
+\section{Workflow Camunda, SLA et automatisation}
+
+\section{Pourquoi un workflow ?}
+
+Le workflow est au coeur de l'identite du projet. Dans beaucoup d'applications de tickets, le cycle de vie est code par une succession de if et de mises a jour de statut. Cela fonctionne jusqu'a un certain point, mais devient difficile a maintenir et a expliquer. Avec Camunda, SupportFlow rend visible le processus. Cela apporte une dimension de pilotage et de demonstration tres forte.
+
+\section{Processus BPMN principal}
+
+Le processus observe dans le fichier BPMN suit une logique simple et convaincante :
+
+\begin{enumerate}[leftmargin=1.2cm]
+  \item creation du ticket ;
+  \item qualification par le manager ;
+  \item resolution par l'agent ;
+  \item validation par le client ;
+  \item decision de cloture ou retour en traitement ;
+  \item archivage ;
+  \item fin du processus.
+\end{enumerate}
+
+Ce schema repond bien au besoin d'un support structure. Il rend claire la place de chaque acteur.
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox{0.84\textwidth}{\centering
+    Emplacement reserve pour un schema BPMN ou une capture Camunda Cockpit.\par
+    La version finale peut illustrer la creation du ticket, la qualification manager, la resolution agent, la validation client et l'archivage.
+  }}
+  \caption{Processus ticket orchestre par Camunda}
+\end{figure}
+
+\section{Timers SLA}
+
+Le workflow integre des boundary events sur l'etape de resolution. Cela signifie que le temps n'est pas un simple attribut calcule en arriere-plan ; il devient un element de comportement du processus. Les seuils a 50\%, 75\% et 100\% permettent de distinguer un suivi simple, une situation a risque et un depassement caracterise.
+
+\section{Valeur des timers}
+
+Cette mecanique est importante d'un point de vue metier. Attendre le depassement du SLA pour agir est trop tardif. Un bon systeme doit donner des signaux faibles avant la rupture. Le niveau a risque joue donc un role preventif, tandis que le niveau de depassement active des mesures plus fortes.
+
+\section{Synchronisation entre base et workflow}
+
+Un point souvent sous-estime dans les projets BPM concerne la synchronisation entre l'etat persiste et l'etat du moteur. Dans SupportFlow, ce sujet est traite de maniere explicite grace au bootstrap Camunda. Lorsqu'un jeu de donnees est injecte directement, le backend peut recreer les instances ou les faire progresser proprement pour que Cockpit retrouve un etat pertinent. Cette capacite a une valeur forte en demonstration et en exploitation.
+
+\section{Camunda Cockpit comme outil de supervision}
+
+L'existence de Cockpit offre une seconde lecture du systeme. Le ticket peut etre observe depuis l'interface metier, mais aussi depuis le moteur de workflow. Cela permet de verifier visuellement qu'un ticket se trouve bien a l'etape attendue, qu'une tache humaine existe ou qu'une instance a ete creee.
+
+\section{Processus et clarte metier}
+
+L'un des apports majeurs du BPMN est de clarifier ce qui est attendu a chaque etape. Un ticket non assigne reste en qualification. Un ticket pris en charge entre dans une resolution active. Un ticket valide declenche l'archivage. Cette clarte est precieuse autant pour les developpeurs que pour les utilisateurs metier.
+
+\section{Limites et vigilance}
+
+Le workflow ne doit pas devenir un doublon confus de la logique applicative. Toute l'intelligence du projet consiste a maintenir une bonne articulation entre etats metier, processus BPMN et comportements du frontend. Les corrections recentes montrent que ce travail d'alignement reste un point central.
+
+
+
+\section{Temps reel, notifications et collaboration}
+
+\section{Importance du temps reel}
+
+Dans un systeme de support, l'information perd de sa valeur si elle arrive trop tard. Les notifications temps reel rendent l'application plus reactive. Elles reduisent le besoin de recharger les pages, renforcent la perception d'activite et facilitent la coordination entre agents, managers et clients.
+
+\section{WebSocket et STOMP}
+
+Le backend s'appuie sur Spring WebSocket et le frontend sur STOMP. Ce duo est classique et efficace pour des notifications applicatives. Il convient bien a un projet de supervision comme SupportFlow, ou plusieurs types d'evenements doivent etre diffuses : creation, assignation, changement de statut, commentaire, alerte SLA et escalade.
+
+\section{Role de NotificationService}
+
+\texttt{NotificationService} n'est pas un simple mecanisme de toast visuel. Il formalise les evenements importants du domaine. Cela permet de donner une existence explicite aux alertes, de compter certaines notifs, de les afficher dans des badges et de garder une trace de leur emission.
+
+\section{Commentaires et pieces jointes}
+
+La collaboration ne passe pas seulement par les statuts. Les commentaires permettent de contextualiser une decision, d'expliquer un blocage, de demander des informations ou de documenter une resolution. Les pieces jointes enrichissent le dossier avec des captures, journaux, exports ou documents metier.
+
+\section{Alertes visibles dans l'interface}
+
+Les corrections recentes ont aussi porte sur la maniere de rendre visibles les alertes SLA et les notifications sur la page de detail ticket. Les badges rouges et les compteurs ne sont pas uniquement decoratifs ; ils servent a attirer l'attention sur ce qui exige une action.
+
+\section{Portee collaborative du projet}
+
+Ces mecanismes renforcent le caractere collaboratif de l'application. Le ticket devient un point de convergence entre plusieurs personnes et non un objet isole entre un createur et un traitant.
+
+
+
+\section{Dimension IA et aide a la decision}
+
+\section{Architecture IA}
+
+Le composant IA est volontairement heberge dans un service separe. Le dossier \texttt{ai-agent} repose sur FastAPI, Uvicorn, HTTPX et la bibliotheque \texttt{ollama}. Le backend principal consomme ensuite cet agent. Cette separation a plusieurs avantages : elle isole les dependances IA, permet d'ajuster la politique de timeout et evite de polluer le backend metier avec des considerations de modele.
+
+\section{Cas d'usage IA}
+
+L'IA intervient sur plusieurs parcours :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item analyse d'un ticket ;
+  \item diagnostic ;
+  \item suggestion de reponse ;
+  \item copilote sur le detail ticket ;
+  \item resume d'escalade ;
+  \item tendances ;
+  \item recommandation d'assignation.
+\end{itemize}
+
+\section{Interet concret}
+
+L'interet de cette brique n'est pas de remplacer l'agent, mais de lui faire gagner du temps. Une suggestion de reponse peut accelerer la redaction d'un retour client. Un diagnostic peut orienter l'investigation. Un resume d'escalade peut faire gagner du temps lors d'un changement d'intervenant. Un copilote peut condenser le contexte d'un dossier long.
+
+\section{Gestion des lenteurs}
+
+L'IA locale peut etre lente, surtout sur une machine de developpement ou avec un modele CPU-only. SupportFlow a justement connu ce type de contrainte. Les derniers correctifs ont donc cherche a reduire l'impact percu de cette lenteur :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item timeout court sur certaines routes critiques comme la recommandation d'assignation ;
+  \item fallback immediate sur des listes de secours ;
+  \item deplacement de certaines operations hors du chemin critique de creation.
+\end{itemize}
+
+\section{Ergonomie et robustesse}
+
+Une autre amelioration importante a consiste a accepter plusieurs formes d'identification de ticket dans l'outil IA : identifiant interne, reference complete ou suffixe numerique. Ce petit detail a une grande valeur ergonomique. Il rapproche l'interface des habitudes reelles des utilisateurs, qui manipulent souvent les references visibles plutot que les IDs de base de donnees.
+
+\section{Vision critique}
+
+L'IA constitue une valeur ajoutee forte, mais elle ne doit jamais devenir un point de fragilite du systeme principal. Le decouplage retenu dans SupportFlow va dans le bon sens. A l'avenir, il serait possible de renforcer la capitalisation de la base de connaissances et la tracabilite des suggestions IA retenues ou rejetees.
+
+
+
+\section{Archivage, GED et reporting}
+
+\section{Dimension documentaire du projet}
+
+Un ticket de support est souvent accompagne de nombreuses traces : captures d'ecran, logs, mails, exports, rapports, justificatifs d'action. L'archivage est donc une dimension essentielle si l'on veut depasser une logique de simple ticketing temporaire.
+
+\section{Alfresco}
+
+L'integration Alfresco montre que SupportFlow ne traite pas le document comme une piece jointe secondaire. L'usage d'une GED permet de mieux structurer la conservation et la consultation de certains contenus, notamment dans une perspective d'audit ou de capitalisation.
+
+\section{Rapports PDF et Excel}
+
+Le projet reference explicitement des services de generation PDF et Excel. Cela ouvre plusieurs usages :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item extraction managere ;
+  \item justification d'un traitement ;
+  \item partage hors application ;
+  \item archive formelle du dossier.
+\end{itemize}
+
+\section{Archivage dans le workflow}
+
+L'etape \texttt{archive\_ticket} du processus BPMN montre que l'archivage n'est pas considere comme un detail optionnel, mais comme une vraie etape de fin de cycle. Cette integrite de conception est un point fort du projet.
+
+\section{Valeur metier}
+
+Le reporting et la GED donnent au projet une dimension plus enterprise. Ils permettent de montrer qu'un ticket resolu ne disparait pas simplement d'une liste, mais peut alimenter une memoire documentaire exploitable.
+
+
+
+\section{Deploiement, exploitation et environnement de demonstration}
+
+\section{Strategie de deploiement}
+
+Le projet est pense pour etre deploye localement via Docker Compose. Cette strategie repond parfaitement aux besoins d'un PFE ou d'une soutenance. Elle simplifie le lancement, minimise les dependances manuelles et rend l'environnement plus portable.
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox{0.84\textwidth}{\centering
+    Emplacement reserve pour la chaine CI/CD et GitOps.\par
+    La figure finale peut montrer GitHub Actions, GHCR, SonarQube, Kubernetes, ArgoCD et les composants SupportFlow.
+  }}
+  \caption{Chaine de build, qualite et deploiement de SupportFlow}
+\end{figure}
+
+\section{Profils Docker}
+
+Le fichier de compose distingue des services toujours actifs et d'autres lies a des profils comme \texttt{tools} ou \texttt{demo}. C'est un bon compromis entre richesse fonctionnelle et maitrise des ressources.
+
+\section{Ports et acces}
+
+Le systeme expose plusieurs points d'acces utiles pour la demonstration :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item frontend sur le port 4200 ;
+  \item backend sur le port 8082 ;
+  \item Keycloak sur le port 8180 ;
+  \item Alfresco sur 8090 ;
+  \item Share sur 8091 ;
+  \item SonarQube sur 9000 ;
+  \item agent IA sur 8000 ;
+  \item Ollama sur 11434 ;
+  \item MailHog sur 8025.
+\end{itemize}
+
+\section{Jeux de donnees et demonstrabilite}
+
+L'existence de \texttt{data-dev.sql}, \texttt{data-test.sql} et \texttt{data-docker.sql} montre que la demonstration a ete prise au serieux. Le jeu de donnees Docker a notamment ete enrichi pour offrir des cas plus realistes, avec plusieurs clients, plusieurs tickets, plusieurs notifications et des situations de criticite differenciees.
+
+\section{Importance de la coherence des seeds}
+
+L'un des enseignements du projet est qu'un seed de base ne suffit pas. Si l'application fait intervenir un moteur BPMN, une simple insertion SQL ne garantit pas la coherence globale. Il faut aussi penser a la creation des workflows ou a leur rehydratation. La correction apportee via le bootstrap Camunda va exactement dans ce sens.
+
+\section{Exploitation et diagnostic}
+
+Le depot contient de nombreux scripts de test et de diagnostic pour Keycloak, Camunda, RBAC ou les parcours de demonstration. Cette richesse documentaire est un atout fort pour la maintenance et la soutenance.
+
+

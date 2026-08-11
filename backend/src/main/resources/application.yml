@@ -28,13 +28,25 @@ spring:
   # JPA Configuration
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: false
         use_sql_comments: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
+
+  task:
+    scheduling:
+      pool:
+        size: 4
         
   # File Upload Configuration
   servlet:
@@ -83,8 +95,8 @@ camunda:
   bpm:
     enabled: true
     admin-user:
-      id: admin
-      password: admin
+      id: ${CAMUNDA_ADMIN_USER:admin}
+      password: ${CAMUNDA_ADMIN_PASSWORD:admin}
       firstName: Admin
       lastName: SupportFlow
     filter:
@@ -123,6 +135,8 @@ alfresco:
 # SLA Configuration
 # ===============================================
 supportflow:
+  security:
+    allowed-origins: ${SUPPORTFLOW_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
   sla:
     critical-hours: 4
     high-hours: 8
@@ -142,6 +156,14 @@ supportflow:
     include-sunday: false
   notifications:
     sla-warning-threshold: 0.75  # Alerte simple "ticket à risque" à 75% du SLA
+  workflow:
+    camunda-enabled: ${CAMUNDA_ENABLED:true}
+    sync:
+      max-attempts: ${WORKFLOW_SYNC_MAX_ATTEMPTS:8}
+      initial-backoff-seconds: ${WORKFLOW_SYNC_INITIAL_BACKOFF_SECONDS:5}
+      max-backoff-seconds: ${WORKFLOW_SYNC_MAX_BACKOFF_SECONDS:900}
+      poll-interval-ms: ${WORKFLOW_SYNC_POLL_INTERVAL_MS:2000}
+      reconcile-interval-ms: ${WORKFLOW_SYNC_RECONCILE_INTERVAL_MS:60000}
   automation:
     interval-ms: 15000           # 15s - adaptatif pour SUPER_CRITICAL
     sla-warning-minutes: 60
@@ -181,6 +203,15 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+        integrations:
+          include: workflowSync,externalDependencies
       
 # ===============================================
 # Logging Configuration
@@ -193,7 +224,7 @@ logging:
     org.springframework.security: INFO
     org.hibernate.SQL: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{requestId:-system}] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%X{requestId:-system}] [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/supportflow.log

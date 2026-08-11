@@ -2,9 +2,15 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client/dist/sockjs';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
-import { filter } from 'rxjs/operators';
+import { filter, finalize } from 'rxjs/operators';
 import { environment } from '@env/environment';
 import { AuthService } from './auth.service';
+
+/** Reference-counted broker subscription: torn down once its last caller unsubscribes. */
+interface RefCountedSubscription {
+  sub: StompSubscription;
+  refCount: number;
+}
 
 export interface WebSocketEvent {
   type: string;
@@ -27,11 +33,25 @@ export class WebSocketService implements OnDestroy {
 
   private client: Client | null = null;
   private subscriptions: StompSubscription[] = [];
+  private connecting = false;
+  // Per-ticket broker subscriptions, keyed by ticketId, reference-counted so that navigating
+  // between tickets (or having multiple components watch the same ticket) doesn't leak an
+  // ever-growing set of live STOMP subscriptions - the previous implementation pushed a new
+  // subscription onto `subscriptions` on every call to subscribeToTicket()/subscribeToTicketComments()
+  // and never removed it until a full disconnect.
+  private ticketSubscriptions = new Map<number, RefCountedSubscription>();
+  private ticketCommentSubscriptions = new Map<number, RefCountedSubscription>();
 
   private connected$ = new BehaviorSubject<boolean>(false);
+  private backendReady$ = new BehaviorSubject<boolean | null>(null);
   private events$ = new Subject<WebSocketEvent>();
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
+  private readonly maxReconnectAttempts = 10;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectEnabled = false;
+  private resettingConnection = false;
+  private readinessGeneration = 0;
+  private readinessAbortController: AbortController | null = null;
 
   constructor(private authService: AuthService) {}
 
@@ -39,8 +59,21 @@ export class WebSocketService implements OnDestroy {
    * Connecte au WebSocket STOMP du backend
    */
   connect(): void {
+    if (this.client?.active || this.connecting) {
+      return;
+    }
+
+    this.reconnectEnabled = true;
+    this.connecting = true;
+    void this.connectWhenBackendReady();
+  }
+
+  private async connectWhenBackendReady(): Promise<void> {
     try {
-      if (this.client?.active) {
+      const backendReady = await this.waitForBackendReady();
+      if (!backendReady) {
+        this.connecting = false;
+        this.scheduleReconnect();
         return;
       }
 
@@ -52,7 +85,7 @@ export class WebSocketService implements OnDestroy {
 
       this.client = new Client({
         webSocketFactory: () => new SockJS(sockJsUrl),
-        reconnectDelay: 5000,
+        reconnectDelay: 0,
         heartbeatIncoming: 10000,
         heartbeatOutgoing: 10000,
         debug: (_msg: string) => {
@@ -61,25 +94,100 @@ export class WebSocketService implements OnDestroy {
         onConnect: () => {
           this.connected$.next(true);
           this.reconnectAttempts = 0;
+          this.connecting = false;
           this.subscribeToTopics();
         },
         onDisconnect: () => {
           this.connected$.next(false);
+          this.connecting = false;
+        },
+        onWebSocketClose: () => {
+          this.connected$.next(false);
+          this.connecting = false;
+          if (!this.resettingConnection) {
+            this.scheduleReconnect();
+          }
         },
         onStompError: (frame) => {
-          console.error('Erreur STOMP:', frame.headers['message']);
-          this.reconnectAttempts++;
-          if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error('Max reconnect attempts reached, stopping');
-            this.client?.deactivate();
-          }
+          this.connecting = false;
+          this.scheduleReconnect();
         }
       });
 
       this.client.activate();
     } catch (error) {
-      console.warn('WebSocket connection failed:', error);
+      this.connecting = false;
+      this.scheduleReconnect();
     }
+  }
+
+  private scheduleReconnect(): void {
+    if (!this.reconnectEnabled || this.reconnectTimer || this.reconnectAttempts >= this.maxReconnectAttempts) {
+      return;
+    }
+
+    this.reconnectAttempts++;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.resetAndReconnect();
+    }, 1000);
+  }
+
+  private async resetAndReconnect(): Promise<void> {
+    this.resettingConnection = true;
+    const client = this.client;
+    this.client = null;
+
+    try {
+      if (client?.active) {
+        await client.deactivate();
+      }
+    } finally {
+      this.resettingConnection = false;
+    }
+
+    if (this.reconnectEnabled) {
+      this.connect();
+    }
+  }
+
+  async waitForBackendReady(maxWaitMs = 60000, pollIntervalMs = 2000): Promise<boolean> {
+    const startedAt = Date.now();
+    const generation = this.readinessGeneration;
+
+    while (this.reconnectEnabled && generation === this.readinessGeneration && Date.now() - startedAt < maxWaitMs) {
+      try {
+        const apiBaseUrl = environment.apiUrl.replace(/\/+$/, '');
+        const controller = new AbortController();
+        this.readinessAbortController = controller;
+        const timeout = setTimeout(() => controller.abort(), Math.min(pollIntervalMs, 3000));
+        const response = await fetch(`${apiBaseUrl}/actuator/health`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (this.readinessAbortController === controller) {
+          this.readinessAbortController = null;
+        }
+
+        const health = await response.json().catch(() => null);
+        if (response.ok && health?.status === 'UP') {
+          this.backendReady$.next(true);
+          return true;
+        }
+      } catch {
+        // Backend still warming up; retry quietly.
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    }
+
+    if (this.reconnectEnabled && generation === this.readinessGeneration) {
+      this.backendReady$.next(false);
+      console.warn('WebSocket backend readiness timeout reached.');
+    }
+    return false;
   }
 
   /**
@@ -122,45 +230,84 @@ export class WebSocketService implements OnDestroy {
   }
 
   /**
-   * S'abonne aux evenements d'un ticket specifique
+   * S'abonne aux evenements d'un ticket specifique.
+   * The underlying broker subscription is reference-counted and torn down automatically once
+   * the last caller unsubscribes from the returned Observable (e.g. component ngOnDestroy),
+   * so repeated navigation between tickets no longer accumulates live STOMP subscriptions.
    */
   subscribeToTicket(ticketId: number): Observable<WebSocketEvent> {
-    if (this.client?.connected) {
-      const sub = this.client.subscribe(`/topic/tickets/${ticketId}`, (message: IMessage) => {
-        try {
-          const event: WebSocketEvent = JSON.parse(message.body);
-          this.events$.next(event);
-        } catch (e) {
-          console.warn('Erreur parsing ticket WebSocket message:', e);
-        }
-      });
-      this.subscriptions.push(sub);
-    }
+    this.acquireTopicSubscription(
+      this.ticketSubscriptions,
+      ticketId,
+      `/topic/tickets/${ticketId}`,
+      'ticket'
+    );
 
     return this.events$.asObservable().pipe(
-      filter(event => event.ticketId === ticketId)
+      filter(event => event.ticketId === ticketId),
+      finalize(() => this.releaseTopicSubscription(this.ticketSubscriptions, ticketId))
     );
   }
 
   /**
-   * S'abonne aux commentaires d'un ticket
+   * S'abonne aux commentaires d'un ticket. Same reference-counted lifecycle as subscribeToTicket().
    */
   subscribeToTicketComments(ticketId: number): Observable<WebSocketEvent> {
-    if (this.client?.connected) {
-      const sub = this.client.subscribe(`/topic/tickets/${ticketId}/comments`, (message: IMessage) => {
-        try {
-          const event: WebSocketEvent = JSON.parse(message.body);
-          this.events$.next(event);
-        } catch (e) {
-          console.warn('Erreur parsing comment WebSocket message:', e);
-        }
-      });
-      this.subscriptions.push(sub);
-    }
+    this.acquireTopicSubscription(
+      this.ticketCommentSubscriptions,
+      ticketId,
+      `/topic/tickets/${ticketId}/comments`,
+      'comment'
+    );
 
     return this.events$.asObservable().pipe(
-      filter(event => event.type === 'NEW_COMMENT' && event.ticketId === ticketId)
+      filter(event => event.type === 'NEW_COMMENT' && event.ticketId === ticketId),
+      finalize(() => this.releaseTopicSubscription(this.ticketCommentSubscriptions, ticketId))
     );
+  }
+
+  private acquireTopicSubscription(
+    registry: Map<number, RefCountedSubscription>,
+    ticketId: number,
+    topic: string,
+    kind: 'ticket' | 'comment'
+  ): void {
+    const existing = registry.get(ticketId);
+    if (existing) {
+      existing.refCount++;
+      return;
+    }
+
+    if (!this.client?.connected) {
+      return;
+    }
+
+    const sub = this.client.subscribe(topic, (message: IMessage) => {
+      try {
+        const event: WebSocketEvent = JSON.parse(message.body);
+        this.events$.next(event);
+      } catch (e) {
+        console.warn(`Erreur parsing ${kind} WebSocket message:`, e);
+      }
+    });
+    registry.set(ticketId, { sub, refCount: 1 });
+  }
+
+  private releaseTopicSubscription(registry: Map<number, RefCountedSubscription>, ticketId: number): void {
+    const entry = registry.get(ticketId);
+    if (!entry) {
+      return;
+    }
+
+    entry.refCount--;
+    if (entry.refCount <= 0) {
+      try {
+        entry.sub.unsubscribe();
+      } catch (e) {
+        // ignore
+      }
+      registry.delete(ticketId);
+    }
   }
 
   /**
@@ -195,15 +342,31 @@ export class WebSocketService implements OnDestroy {
     return this.connected$.asObservable();
   }
 
+  isBackendReady(): Observable<boolean | null> {
+    return this.backendReady$.asObservable();
+  }
+
   /**
    * Deconnecte proprement
    */
   disconnect(): void {
     this.unsubscribeAll();
-    if (this.client?.active) {
-      this.client.deactivate();
+    this.connecting = false;
+    this.reconnectEnabled = false;
+    this.readinessGeneration++;
+    this.readinessAbortController?.abort();
+    this.readinessAbortController = null;
+    this.reconnectAttempts = 0;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
+    if (this.client?.active) {
+      void this.client.deactivate();
+    }
+    this.client = null;
     this.connected$.next(false);
+    this.backendReady$.next(null);
   }
 
   private unsubscribeAll(): void {
@@ -215,10 +378,26 @@ export class WebSocketService implements OnDestroy {
       }
     });
     this.subscriptions = [];
+
+    // Broker subscriptions tied to the client being torn down are no longer valid; clear the
+    // registries so a subsequent reconnect doesn't mistake a stale entry for a live one (which
+    // would make acquireTopicSubscription() skip re-subscribing on the new client connection).
+    this.clearTopicRegistry(this.ticketSubscriptions);
+    this.clearTopicRegistry(this.ticketCommentSubscriptions);
+  }
+
+  private clearTopicRegistry(registry: Map<number, RefCountedSubscription>): void {
+    registry.forEach(entry => {
+      try {
+        entry.sub.unsubscribe();
+      } catch (e) {
+        // ignore
+      }
+    });
+    registry.clear();
   }
 
   ngOnDestroy(): void {
     this.disconnect();
   }
 }
-

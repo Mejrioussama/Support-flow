@@ -1,0 +1,131 @@
+﻿\chapter{Methodologie et conduite du projet}
+
+\section{Approche generale}
+
+La construction de SupportFlow s'apparente a une demarche iterative. Le projet mobilise plusieurs domaines difficiles a faire converger en une seule fois : developpement frontend, developpement backend, securite, workflow BPMN, temps reel, archivage documentaire et intelligence artificielle locale. Dans une telle configuration, la methode la plus realiste consiste a avancer par increments : construire un socle, l'enrichir, observer les effets de bord, puis consolider.
+
+Cette methode iterative est visible a travers la documentation du depot, les rapports d'etat successifs, les scripts de diagnostic et les corrections recentes. Elle correspond a un mode de construction progressif dans lequel chaque nouvelle brique doit etre validee non seulement seule, mais aussi dans sa relation avec le reste de l'application.
+
+\section{Organisation pratique du travail}
+
+Sur le plan pratique, la conduite du projet a combine plusieurs activites menees en continu : analyse fonctionnelle, developpement frontend, developpement backend, integration des outils externes, tests manuels, tests scripts, corrections transverses et production documentaire. Cette organisation a impose un rythme de travail regulier, avec des allers-retours frequents entre implementation et verification.
+
+Le projet n'a pas ete mene comme une suite de taches completement lineaires. Il a plutot evolue selon un schema de boucles courtes :
+
+\begin{enumerate}[leftmargin=1.2cm]
+  \item identification d'un besoin ou d'un point de friction ;
+  \item mise en oeuvre d'une correction ou d'une nouvelle fonction ;
+  \item verification sur l'interface et sur les APIs ;
+  \item observation des effets de bord ;
+  \item documentation et consolidation.
+\end{enumerate}
+
+\section{Phases logiques de construction}
+
+Le projet peut etre relu selon une succession de grandes phases.
+
+\subsection{Phase 1 : socle applicatif}
+
+La premiere phase consiste a mettre en place le coeur de l'application : entites principales, CRUD de base, premiere interface, authentification et communication frontend-backend. Cette etape est indispensable pour etablir un squelette solide.
+
+\subsection{Phase 2 : approfondissement metier}
+
+Une fois le socle stable, le projet integre des dimensions plus riches : regles de priorisation, cycle de vie du ticket, commentaires, pieces jointes, tableaux de bord, notifications et roles differencies.
+
+\subsection{Phase 3 : automatisation et supervision}
+
+L'ajout de Camunda et des mecanismes SLA transforme progressivement l'application en veritable outil de pilotage. Le ticket cesse d'etre un simple enregistrement pour devenir un processus pilotable.
+
+\subsection{Phase 4 : experience avancee et IA}
+
+La derniere grande phase introduit des briques a forte valeur ajoutee : GED, assistant IA, recommandations d'assignation, copilote de ticket et scenarios de demonstration plus realistes.
+
+\section{Planning synthetique du stage}
+
+Le planning du stage peut etre relu en cinq grandes periodes. Cette presentation est volontairement synthetique ; elle pourra etre remplacee ou completee par un diagramme de Gantt en version finale.
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}p{10.5cm}}
+\toprule
+Periode & Activites dominantes \\
+\midrule
+Semaine 1 a 2 & Cadrage du sujet, lecture du besoin, etude des briques techniques, prise en main du depot et de l'environnement de travail. \\
+Semaine 3 a 5 & Mise en place et consolidation du socle applicatif : entites principales, APIs, premiers ecrans, authentification et communication frontend-backend. \\
+Semaine 6 a 8 & Enrichissement metier : roles, priorites, SLA, notifications, commentaires, pieces jointes, detail ticket et supervision. \\
+Semaine 9 a 11 & Integrations avancees : Camunda, GED Alfresco, IA, reporting, chaine GitHub Actions, SonarQube et GitOps. \\
+Semaine 12 et plus & Stabilisation, corrections transverses, tests complets, relecture documentaire, preparation de la soutenance et du rapport final. \\
+\bottomrule
+\end{longtable}
+
+\section{Travail d'alignement}
+
+Un projet riche comme SupportFlow ne se juge pas seulement a la quantite de ses modules, mais a leur alignement. Les corrections recentes l'ont montre avec force. Il ne suffit pas que l'API accepte une action si le bouton correspondant n'est pas visible. Il ne suffit pas que le BPMN soit correct si le seed de donnees ne cree pas les bonnes instances. Il ne suffit pas que l'IA fonctionne si son delai degrade tout le parcours utilisateur.
+
+La vraie valeur du travail recent tient justement dans cet alignement progressif :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item alignement entre permissions backend et boutons frontend ;
+  \item alignement entre seed SQL et workflows Camunda ;
+  \item alignement entre references visibles et identifiants internes ;
+  \item alignement entre shortlist d'assignation et lecture metier des etats d'agents.
+\end{itemize}
+
+\section{Gestion de la complexite}
+
+Chaque fonctionnalite importante met en jeu plusieurs couches. Par exemple, assigner un ticket peut impliquer une validation d'autorisation, une mise a jour en base, une notification, une evolution du workflow, une adaptation du detail ticket et parfois un recalcule d'indicateurs. Cette complexite n'est pas un signe de mauvaise conception ; elle est inherente a un outil metier complet.
+
+L'enjeu consiste donc a rendre cette complexite gouvernable. SupportFlow y parvient par plusieurs moyens :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item separation controllers/services/repositories ;
+  \item services specialises pour les domaines transverses ;
+  \item documentation abondante ;
+  \item scripts de tests et de diagnostic ;
+  \item conteneurisation complete de l'environnement.
+\end{itemize}
+
+\section{Role de la demonstration dans la methode}
+
+Une particularite forte du projet est l'importance accordee a la demonstration. Dans beaucoup de projets, l'environnement de demo est bricole en fin de parcours. Ici, il fait quasiment partie du produit. Les conteneurs, les seeds, Camunda Cockpit, Keycloak, Alfresco et meme l'agent IA composent un environnement complet qui peut etre montre.
+
+Cette orientation influence la methode. Il faut penser non seulement a ce qui fonctionne en theorie, mais aussi a ce qui sera visible, comprensible et reproductible en soutenance.
+
+\section{Difficultes rencontrees}
+
+Comme tout projet riche en integrations, SupportFlow a fait apparaitre plusieurs difficultes. Les principales ne venaient pas d'un unique composant, mais plutot des zones de jonction entre composants :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item incoherences ponctuelles entre les permissions backend et les boutons visibles dans le frontend ;
+  \item ecarts entre les donnees seed et l'etat reel attendu dans Camunda ;
+  \item latences excessives lorsque des traitements annexes ou IA restaient dans le chemin critique ;
+  \item incomprehensions metier possibles sur l'assignation et l'escalade ;
+  \item sensibilite des scenarios de demonstration aux problemes d'environnement local.
+\end{itemize}
+
+Ces difficultes ont eu une valeur pedagogique importante. Elles ont montre qu'un projet applicatif complet se juge autant sur son integrabilite que sur ses fonctionnalites isolees.
+
+\section{Ajustements des objectifs}
+
+Au cours du stage, certains objectifs ont ete ajustes pour privilegier la coherence globale et la demonstrabilite. Par exemple, l'effort n'a pas seulement porte sur l'ajout de nouvelles fonctions, mais aussi sur :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item la correction des points bloquants pour les profils client, agent et manager ;
+  \item la clarification des droits metier ;
+  \item la reprise de la chaine GitOps pour obtenir une preuve de deploiement credible ;
+  \item l'industrialisation des elements de soutenance : seeds, scripts, documentation, rapport et presentation.
+\end{itemize}
+
+Ce recentrage est logique dans un projet de fin d'etudes. Il vaut mieux produire une solution complete, coherente et defendable qu'empiler des fonctions peu stabilisees.
+
+\section{Lecons de conduite de projet}
+
+Les lecons principales tirees de cette construction sont les suivantes :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item la premiere version fonctionnelle n'est jamais la version la plus revelatrice ;
+  \item les frictions les plus importantes apparaissent souvent aux interfaces entre composants ;
+  \item un bon seed de demonstration vaut presque autant qu'une bonne interface ;
+  \item la centralisation des autorisations est indispensable dans un projet multi-profils ;
+  \item les composants lents comme l'IA doivent etre traites avec des strategies de fallback.
+\end{itemize}
+
+

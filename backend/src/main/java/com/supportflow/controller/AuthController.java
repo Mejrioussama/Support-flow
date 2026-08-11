@@ -83,12 +83,12 @@ public class AuthController {
     @Operation(summary = "Enregistrer un nouvel utilisateur")
     public ResponseEntity<UserDTO> register(@Valid @RequestBody RegisterRequest request) {
         log.info("Demande d'inscription: {}", request.getUsername());
-        
-        // Par défaut, les nouveaux utilisateurs sont des clients
-        if (request.getRole() == null) {
-            request.setRole(Role.CLIENT);
-        }
-        
+
+        // L'auto-inscription ne doit jamais permettre de choisir son propre rôle :
+        // le rôle envoyé par l'appelant est ignoré, tout nouvel inscrit est CLIENT.
+        // L'élévation de rôle (agent/manager/admin) doit passer par un administrateur.
+        request.setRole(Role.CLIENT);
+
         UserDTO user = userService.createUser(request);
         
         log.info("Inscription réussie: {}", request.getUsername());
@@ -99,21 +99,23 @@ public class AuthController {
     @Operation(summary = "Rafraîchir le token d'accès")
     public ResponseEntity<JwtResponse> refreshToken(
             @RequestHeader("Authorization") String refreshToken) {
-        
+
         if (refreshToken != null && refreshToken.startsWith("Bearer ")) {
             refreshToken = refreshToken.substring(7);
         }
-        
+
         if (tokenProvider.validateToken(refreshToken)) {
             String username = tokenProvider.getUsernameFromToken(refreshToken);
-            
+
             User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-            
+
             String roles = "ROLE_" + user.getRole().name();
             String newAccessToken = tokenProvider.generateAccessToken(username, roles);
             String newRefreshToken = tokenProvider.generateRefreshToken(username);
-            
+            // Rotate: the old refresh token must not remain usable once a new pair is issued.
+            tokenProvider.revokeToken(refreshToken);
+
             return ResponseEntity.ok(JwtResponse.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
@@ -126,13 +128,19 @@ public class AuthController {
                 .role(user.getRole())
                 .build());
         }
-        
+
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
-    
+
     @PostMapping("/logout")
     @Operation(summary = "Déconnecter un utilisateur")
-    public ResponseEntity<Void> logout() {
+    public ResponseEntity<Void> logout(@RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+        // Revoke the presented token so it's rejected immediately on the next request, instead
+        // of merely clearing this request's (stateless, per-request) SecurityContext - which by
+        // itself had no effect on whether the same token would still authenticate later.
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            tokenProvider.revokeToken(authorizationHeader.substring(7));
+        }
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok().build();
     }

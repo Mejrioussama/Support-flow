@@ -5,6 +5,7 @@ import com.supportflow.entity.Comment;
 import com.supportflow.entity.Ticket;
 import com.supportflow.entity.TicketHistory;
 import com.supportflow.entity.User;
+import com.supportflow.entity.enums.TicketHistoryAction;
 import com.supportflow.entity.enums.TicketStatus;
 import com.supportflow.exception.ResourceNotFoundException;
 import com.supportflow.mapper.EntityMapper;
@@ -102,7 +103,7 @@ public class CommentService {
 
             TicketHistory resumeHistory = new TicketHistory();
             resumeHistory.setTicket(ticket);
-            resumeHistory.setAction("CUSTOMER_RESPONSE_RECEIVED");
+            resumeHistory.setAction(TicketHistoryAction.CUSTOMER_RESPONSE_RECEIVED);
             resumeHistory.setOldValue(previousStatus.name());
             resumeHistory.setNewValue(TicketStatus.IN_PROGRESS.name());
             resumeHistory.setDescription("Le client a repondu. Le ticket repasse en traitement et le SLA reprend.");

@@ -8,3 +8,4 @@ patches:
   - path: backend-patch.yaml
   - path: frontend-patch.yaml
   - path: frontend-service-patch.yaml
+  - path: frontend-runtime-patch.yaml

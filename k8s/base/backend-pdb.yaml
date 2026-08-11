@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: supportflow-backend
+  namespace: supportflow
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: supportflow-backend

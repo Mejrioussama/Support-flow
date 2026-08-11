@@ -68,3 +68,6 @@ INSERT INTO notifications (id, title, message, type, icon, link, is_read, ticket
 VALUES
 (1, 'Nouveau ticket cree', 'Le ticket SF-0001 a ete cree: Impossible d''acceder au portail client', 'TICKET_CREATED', 'pi-plus-circle', '/tickets/1', false, 'SF-0001', 2, 1, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 0),
 (2, 'Ticket assigne', 'Le ticket SF-0002 vous a ete assigne', 'TICKET_ASSIGNED', 'pi-user', '/tickets/2', false, 'SF-0002', 4, 2, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 0);
+
+-- Compteur de reference tickets (doit demarrer apres le dernier SF-#### seede ci-dessus)
+INSERT INTO ticket_reference_sequence (id, seq_value) VALUES (1, 4);

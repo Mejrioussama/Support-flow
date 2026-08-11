@@ -1,0 +1,146 @@
+﻿\chapter{Conception generale de la solution}
+
+\section{Vue d'ensemble architecturale}
+
+L'architecture de SupportFlow est de type full stack distribuee localement. Elle se compose d'un frontend Angular, d'un backend Spring Boot, d'une base MySQL, d'un moteur Camunda embarque dans le backend, d'un serveur Keycloak pour l'authentification, d'un ensemble Alfresco pour la GED, et d'un sous-systeme IA separe base sur FastAPI et Ollama.
+
+Cette architecture est pertinente car elle decouple les responsabilites tout en restant facilement demonstrable. Chaque brique a un role clair. La separation entre frontend et backend est nette. La securite est deleguee a un composant dedie. Le workflow n'est pas code en dur dans une logique imperative opaque mais modelise en BPMN. La GED et l'IA sont integrees mais restent relativement independantes du coeur transactionnel.
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox{0.84\textwidth}{\centering
+    Emplacement reserve pour le schema d'architecture globale de SupportFlow.\par
+    Inserer ici une figure finale montrant Angular, Spring Boot, Keycloak, Camunda, Alfresco, l'agent IA, Docker et la chaine GitOps.
+  }}
+  \caption{Architecture generale de la solution SupportFlow}
+\end{figure}
+
+\section{Justification des choix technologiques}
+
+\subsection{Pourquoi Angular 17 ?}
+
+Angular est adapte a une interface d'entreprise riche, basee sur plusieurs ecrans, des tableaux, des formulaires complexes, des guards, des services HTTP et une gestion d'etat reactive. Angular Material facilite l'implementation rapide de composants standardises. Le projet exploite ce socle pour les tableaux pagines, les dialogues, les chips, les formulaires et les notifications visuelles.
+
+\subsection{Pourquoi Spring Boot 3.2 ?}
+
+Spring Boot permet de structurer rapidement une API REST robuste, securisee et modulable. L'ecosysteme Spring repond bien aux besoins du projet : web, validation, securite, data JPA, WebSocket, mail, Actuator. Le choix de Java 17 apporte un langage mature et bien adapte aux projets structurants.
+
+\subsection{Pourquoi Camunda 7 ?}
+
+Camunda repond a un besoin essentiel du projet : separer les transitions metier de la logique purement CRUD. Dans SupportFlow, le workflow du ticket est un objet metier en soi. Camunda permet d'en faire une representation visible, executable et instrumentable.
+
+\subsection{Pourquoi Keycloak ?}
+
+Un projet qui gere plusieurs roles et plusieurs types d'utilisateurs gagne beaucoup a externaliser l'authentification. Keycloak apporte un socle IAM moderne, des JWT standard, un realm configurable, une gestion des clients et un modele de roles souple.
+
+\subsection{Pourquoi Docker Compose ?}
+
+Docker Compose offre une excellente base pour un projet de soutenance. Il permet de figer l'environnement, de documenter les dependances, d'assurer la reproductibilite et de lancer facilement une demo complete.
+
+\section{Description des services Docker}
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{2.8cm} >{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{1.9cm} >{\raggedright\arraybackslash}p{4.9cm}}
+\toprule
+Service & Image / origine & Port principal & Role \\
+\midrule
+\code{mysql} & \code{mysql:8.0} & 3306 & Base de donnees principale. \\
+\code{keycloak} & \code{quay.io/keycloak/keycloak:23.0} & 8180 & Authentification et gestion des roles. \\
+\code{backend} & build local Spring Boot & 8082 vers 8080 & API REST, logique metier, moteur Camunda. \\
+\code{frontend} & build Angular + Nginx & 4200 vers 80 & Interface utilisateur. \\
+\code{alfresco-postgres} & \code{postgres:14} & interne & Base de donnees Alfresco. \\
+\code{alfresco} & \code{alfresco-content-repository-community:7.4.0} & 8090 & GED documentaire. \\
+\code{share} & \code{alfresco-share:7.4.0} & 8091 & Interface Alfresco Share. \\
+\code{sonarqube} & \code{sonarqube:community} & 9000 & Qualite de code, profil \code{tools}. \\
+\code{mailhog} & \code{mailhog/mailhog} & 8025 et 1025 & SMTP de test, profil \code{tools}. \\
+\code{ollama} & \code{ollama/ollama:latest} & 11434 & Serveur de modele local. \\
+\code{ollama-init} & \code{ollama/ollama:latest} & interne & Telechargement du modele initial. \\
+\code{ai-agent} & build FastAPI local & 8000 & Agent IA consommant Ollama. \\
+\code{demo-data-loader} & \code{mysql:8.0} & interne & Recharge optionnelle des donnees de demo. \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+\section{Healthchecks et robustesse}
+
+La presence de healthchecks dans le compose montre une preoccupation reelle pour la robustesse de l'environnement. Chaque composant critique expose une condition de sante simple mais efficace : ping MySQL, route de readiness Keycloak, endpoint Actuator backend, reponse HTTP frontend, verification de l'agent IA. Ce dispositif est utile en demonstration, mais aussi pour comprendre rapidement quel composant est en faute en cas de dysfonctionnement.
+
+\section{Flux applicatifs principaux}
+
+Le flux principal part du frontend, passe par le backend, mobilise la base, les services metiers et le moteur Camunda, puis renvoie l'information enrichie a l'utilisateur. Certains flux annexes se branchent en parallele :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item les notifications WebSocket repartent du backend vers le frontend ;
+  \item les pieces jointes et rapports peuvent etre archives dans Alfresco ;
+  \item les demandes d'assistance intelligente transitent du backend vers l'agent IA puis Ollama ;
+  \item les actions d'authentification passent par Keycloak.
+\end{itemize}
+
+\section{Qualites architecturales obtenues}
+
+L'architecture offre plusieurs qualites notables. D'abord, elle est pedagogiquement lisible : chaque composant a un role identifiable. Ensuite, elle est credibilisante : l'usage d'une IAM, d'un workflow BPMN et d'une GED rapproche le projet d'un SI d'entreprise. Enfin, elle est evolutive : il est possible d'enrichir les regles metier, de brancher d'autres sources documentaires ou de remplacer l'agent IA sans remettre en cause toute l'application.
+
+
+
+\section{Modele de donnees et regles metier}
+
+\section{Le ticket comme entite centrale}
+
+Le ticket est l'objet principal de SupportFlow. Il concentre les dimensions fonctionnelles, techniques et organisationnelles du projet. A travers lui se croisent le client, l'agent, le manager, le SLA, le workflow, les notifications, les commentaires, les pieces jointes, la satisfaction et l'archivage.
+
+Un bon modele de ticket doit donc porter plus que quelques champs textuels. Il doit pouvoir restituer l'etat courant du dossier, son urgence, son contexte, son historisation et les responsabilites associees.
+
+\section{Autres entites structurantes}
+
+Autour du ticket gravitent plusieurs entites structurantes :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item l'utilisateur ;
+  \item le client ;
+  \item le commentaire ;
+  \item la notification ;
+  \item la piece jointe ;
+  \item l'historique de ticket ;
+  \item les evenements d'escalade ;
+  \item les elements de satisfaction.
+\end{itemize}
+
+\section{Attributs metiers importants}
+
+Le projet mobilise plusieurs attributs metiers qui ne sont pas anecdotiques :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item priorite ;
+  \item severite ;
+  \item impact ;
+  \item score ;
+  \item agent assigne ;
+  \item etat SLA ;
+  \item niveau d'escalade ;
+  \item date d'echeance ;
+  \item date de creation ;
+  \item date de mise a jour ;
+  \item etat de validation client.
+\end{itemize}
+
+\section{Statuts de ticket}
+
+Le projet a recours a plusieurs statuts. Ils sont essentiels pour piloter les transitions et conditionner les actions disponibles. Selon les parcours et les corrections recentes, les statuts ou etats manipules couvrent des phases comme \texttt{NEW}, \texttt{OPEN}, \texttt{IN\_PROGRESS}, \texttt{PENDING}, \texttt{RESOLVED}, \texttt{CLOSED}, ainsi que des etats lies a l'escalade ou au suivi SLA.
+
+Un des enjeux du projet est justement de faire en sorte que chaque statut reste lisible du point de vue metier. Si plusieurs statuts se recouvrent ou si l'on ne sait plus quelle action est attendue, l'outil devient moins efficace.
+
+\section{Priorisation et SLA}
+
+La priorisation est fondee sur une combinaison de severite, d'impact et d'autres facteurs. Le but est de transformer une perception qualitative en un pilotage plus objectif. Le SLA ensuite traduit cette priorite en delai cible. Le moteur de workflow peut alors reactiver des alertes a des seuils precis.
+
+\section{Historique et auditabilite}
+
+Un projet de support serieux doit permettre de reconstituer l'histoire d'un ticket. Qui l'a cree ? Qui l'a assigne ? Quand a-t-il ete pris en charge ? Pourquoi a-t-il ete escalade ? Quel commentaire a provoque un changement d'orientation ? Le fait que SupportFlow embarque un historique dedie est donc une force structurante.
+
+\section{Maturite metier observee}
+
+Le modele de donnees n'est pas qu'un schema de persistance. Il porte une certaine maturite metier. On le voit dans la prise en compte du SLA, de la satisfaction, des pieces jointes, des historiques et des evenements d'escalade. Cela donne a l'application une profondeur superieure a celle d'un simple outil de tickets minimaliste.
+
+

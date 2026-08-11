@@ -16,6 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -44,6 +45,11 @@ class TicketAutomationServiceTest {
         ReflectionTestUtils.setField(automationService, "slaCriticalHours", 24L);
         ReflectionTestUtils.setField(automationService, "slaCriticalRepeatHours", 6L);
         ReflectionTestUtils.setField(automationService, "pendingBlockedHours", 24L);
+        // Each ticket mutation now runs through self.processTicketInIsolatedTransaction(...) in
+        // its own REQUIRES_NEW transaction (see class javadoc). Outside a real Spring context
+        // "self" must be wired manually to the same instance so the self-invocation still calls
+        // through to the real method body instead of NPE-ing on an unset proxy reference.
+        ReflectionTestUtils.setField(automationService, "self", automationService);
 
         testClient = new Client();
         testClient.setId(1L);
@@ -71,6 +77,9 @@ class TicketAutomationServiceTest {
 
         lenient().when(slaComputationService.isBreached(any(Ticket.class), any(LocalDateTime.class))).thenReturn(false);
         lenient().when(slaComputationService.computePhase(any(Ticket.class), any(LocalDateTime.class))).thenReturn("ON_TRACK");
+        // processTicketInIsolatedTransaction() re-fetches the ticket under lock before mutating;
+        // every test in this class drives the cycle through the same testTicket (id=100L).
+        lenient().when(ticketRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(testTicket));
     }
 
     // ─────────────────────────────────────────
@@ -100,7 +109,7 @@ class TicketAutomationServiceTest {
                 return true;
             }));
             verify(historyRepository).save(argThat(h ->
-                "SLA_AUTO_PAUSED".equals(h.getAction())));
+                TicketHistoryAction.SLA_AUTO_PAUSED.equals(h.getAction())));
         }
 
         @Test
@@ -142,7 +151,7 @@ class TicketAutomationServiceTest {
             testTicket.setSlaPaused(false);
 
             when(ticketRepository.findActiveTicketsForSlaWarning(any())).thenReturn(List.of(testTicket));
-            when(historyRepository.existsByTicketIdAndAction(100L, "SLA_AT_RISK_ALERT")).thenReturn(false);
+            when(historyRepository.existsByTicketIdAndAction(100L, TicketHistoryAction.SLA_AT_RISK_ALERT)).thenReturn(false);
             when(slaComputationService.computePhase(eq(testTicket), any(LocalDateTime.class))).thenReturn("AT_RISK");
 
             automationService.runAutomationCycle();
@@ -154,7 +163,7 @@ class TicketAutomationServiceTest {
             }));
             verify(notificationService).notifySlaAtRisk(testTicket);
             verify(historyRepository).save(argThat(h ->
-                "SLA_AT_RISK_ALERT".equals(h.getAction())));
+                TicketHistoryAction.SLA_AT_RISK_ALERT.equals(h.getAction())));
         }
 
         @Test
@@ -170,7 +179,7 @@ class TicketAutomationServiceTest {
             testTicket.setPriority(Priority.LOW);
 
             when(ticketRepository.findActiveTicketsForSlaWarning(any())).thenReturn(List.of(testTicket));
-            when(historyRepository.existsByTicketIdAndAction(100L, "SLA_AT_RISK_ALERT")).thenReturn(false);
+            when(historyRepository.existsByTicketIdAndAction(100L, TicketHistoryAction.SLA_AT_RISK_ALERT)).thenReturn(false);
             when(slaComputationService.computePhase(eq(testTicket), any(LocalDateTime.class))).thenReturn("AT_RISK");
 
             automationService.runAutomationCycle();
@@ -194,7 +203,7 @@ class TicketAutomationServiceTest {
             testTicket.setSlaPaused(false);
 
             when(ticketRepository.findActiveTicketsForSlaWarning(any())).thenReturn(List.of(testTicket));
-            when(historyRepository.existsByTicketIdAndAction(100L, "SLA_AT_RISK_ALERT")).thenReturn(true);
+            when(historyRepository.existsByTicketIdAndAction(100L, TicketHistoryAction.SLA_AT_RISK_ALERT)).thenReturn(true);
             when(slaComputationService.computePhase(eq(testTicket), any(LocalDateTime.class))).thenReturn("AT_RISK");
 
             automationService.runAutomationCycle();
@@ -312,14 +321,14 @@ class TicketAutomationServiceTest {
             testTicket.setEscalatedAt(LocalDateTime.now().minusHours(30));
 
             when(ticketRepository.findSlaEscalatedOlderThan(any())).thenReturn(List.of(testTicket));
-            when(historyRepository.existsByTicketIdAndActionAndCreatedAtAfter(eq(100L), eq("SLA_CRITICAL_EVENT"), any()))
+            when(historyRepository.existsByTicketIdAndActionAndCreatedAtAfter(eq(100L), eq(TicketHistoryAction.SLA_CRITICAL_EVENT), any()))
                 .thenReturn(false);
 
             automationService.runAutomationCycle();
 
             verify(notificationService).notifyLongRunningEscalation(testTicket);
             verify(historyRepository).save(argThat(h ->
-                "SLA_CRITICAL_EVENT".equals(h.getAction())));
+                TicketHistoryAction.SLA_CRITICAL_EVENT.equals(h.getAction())));
         }
 
         @Test
@@ -328,7 +337,7 @@ class TicketAutomationServiceTest {
             testTicket.setStatus(TicketStatus.ESCALATED_SLA);
 
             when(ticketRepository.findSlaEscalatedOlderThan(any())).thenReturn(List.of(testTicket));
-            when(historyRepository.existsByTicketIdAndActionAndCreatedAtAfter(eq(100L), eq("SLA_CRITICAL_EVENT"), any()))
+            when(historyRepository.existsByTicketIdAndActionAndCreatedAtAfter(eq(100L), eq(TicketHistoryAction.SLA_CRITICAL_EVENT), any()))
                 .thenReturn(true); // Already notified recently
 
             automationService.runAutomationCycle();

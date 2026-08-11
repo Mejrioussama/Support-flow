@@ -1,6 +1,6 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://127.0.0.1:8082/api',
+  apiUrl: '/api',
   alfresco: {
     shareUrl: 'http://localhost:8091/share'
   },
@@ -10,6 +10,6 @@ export const environment = {
     clientId: 'supportflow-frontend'
   },
   websocket: {
-    url: 'ws://127.0.0.1:8082/api/ws'
+    url: '/api/ws'
   }
 };

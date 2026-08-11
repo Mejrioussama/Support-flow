@@ -85,6 +85,14 @@ type KeycloakFilter = 'ALL' | 'LINKED' | 'MISSING';
             <strong>Derniere migration Keycloak</strong>
             <p>{{ getMigrationSummary() }}</p>
           </div>
+          <button
+            pButton
+            type="button"
+            class="p-button-text p-button-sm"
+            [icon]="revealMigrationPasswords ? 'pi pi-eye-slash' : 'pi pi-eye'"
+            [label]="revealMigrationPasswords ? 'Masquer' : 'Afficher'"
+            (click)="toggleMigrationPasswordsVisibility()">
+          </button>
         </section>
       }
 
@@ -528,6 +536,10 @@ export class UserListComponent implements OnInit {
   rawUsers: User[] = [];
   visibleUsers: User[] = [];
   lastMigrationResults: KeycloakMigrationResult[] = [];
+  // Generated passwords are masked by default and only revealed on explicit admin action -
+  // previously they were rendered in plaintext in a banner that stayed on screen indefinitely
+  // after a migration, visible to anyone glancing at (or screenshotting) the admin's screen.
+  revealMigrationPasswords = false;
 
   constructor(
     private readonly userService: UserService,
@@ -616,6 +628,7 @@ export class UserListComponent implements OnInit {
     this.userService.migrateExistingUsersToKeycloak().subscribe({
       next: (results) => {
         this.lastMigrationResults = results;
+        this.revealMigrationPasswords = false;
         this.migratingKeycloak = false;
         this.loadUsers();
         this.snackBar.open(
@@ -721,8 +734,12 @@ export class UserListComponent implements OnInit {
   getMigrationSummary(): string {
     return this.lastMigrationResults
       .slice(0, 4)
-      .map((item) => `${item.username} (${item.password})`)
+      .map((item) => `${item.username} (${this.revealMigrationPasswords ? item.password : '••••••••'})`)
       .join(' · ');
+  }
+
+  toggleMigrationPasswordsVisibility(): void {
+    this.revealMigrationPasswords = !this.revealMigrationPasswords;
   }
 
   getPaginatorLength(): number {

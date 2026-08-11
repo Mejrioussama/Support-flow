@@ -17,6 +17,7 @@
 
 ## DevOps, qualite et deploiement
 
+- [TECHNICAL_GUIDE_SUPPORTFLOW.md](TECHNICAL_GUIDE_SUPPORTFLOW.md)
 - [DEVOPS_GITOPS_SUPPORTFLOW.md](DEVOPS_GITOPS_SUPPORTFLOW.md)
 - [REMOTE_EXECUTION_GITHUB_ARGOCD.md](REMOTE_EXECUTION_GITHUB_ARGOCD.md)
 - [LOCAL_GITOPS_KIND.md](LOCAL_GITOPS_KIND.md)
@@ -27,6 +28,7 @@
 ## Soutenance et livrables
 
 - [SOUTENANCE_SUPPORTFLOW.md](SOUTENANCE_SUPPORTFLOW.md)
+- [SupportFlow-Rapport-Complet.pptx](SupportFlow-Rapport-Complet.pptx)
 - [SupportFlow-Soutenance.pptx](SupportFlow-Soutenance.pptx)
 - [rapport_supportflow_2026.tex](rapport_supportflow_2026.tex)
 - [memoire_supportflow_80p.tex](memoire_supportflow_80p.tex)

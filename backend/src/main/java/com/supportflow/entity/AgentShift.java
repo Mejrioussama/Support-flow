@@ -3,6 +3,8 @@ package com.supportflow.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
@@ -27,6 +29,7 @@ public class AgentShift extends BaseEntity {
     private User agent;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "day_of_week", nullable = false, length = 10)
     private DayOfWeek dayOfWeek;
 

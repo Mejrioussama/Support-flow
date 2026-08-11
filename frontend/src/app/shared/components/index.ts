@@ -1,5 +1,3 @@
-export * from './confirm-dialog/confirm-dialog.component';
-export * from './loading-spinner/loading-spinner.component';
 export * from './sla-indicator/sla-indicator.component';
 export * from './sla-notification-item/sla-notification-item.component';
 export * from './page-header/page-header.component';

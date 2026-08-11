@@ -10,7 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AgentWorkbench, Ticket, TicketResolveRequest, TicketStatus, WaitingOn } from '@core/models';
-import { AuthService, TicketService } from '@core/services';
+import { AuthService, TicketAction, TicketService } from '@core/services';
 import { ResolveDialogComponent, ResolveDialogResult } from '../resolve-dialog/resolve-dialog.component';
 import {
   TicketWorkflowActionDialogComponent,
@@ -607,7 +607,7 @@ export class AgentWorkbenchComponent implements OnInit {
     return segmentKey === 'reply' || segmentKey === 'rejected';
   }
 
-  canAct(ticket: Ticket, action: string): boolean {
+  canAct(ticket: Ticket, action: TicketAction): boolean {
     return this.authService.canActOnTicket(ticket, action);
   }
 

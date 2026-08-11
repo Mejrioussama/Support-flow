@@ -3,6 +3,7 @@ package com.supportflow.service;
 import com.supportflow.dto.TicketResponseDTO;
 import com.supportflow.entity.*;
 import com.supportflow.entity.enums.TicketStatus;
+import com.supportflow.entity.enums.WorkflowSyncAction;
 import com.supportflow.exception.ArchiveIntegrationException;
 import com.supportflow.exception.BusinessException;
 import com.supportflow.mapper.EntityMapper;
@@ -15,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -33,6 +35,7 @@ public class TicketArchiveServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private CamundaService camundaService;
     @Mock private CamundaAsyncService camundaAsyncService;
+    @Mock private WorkflowSynchronization workflowSyncService;
     @Mock private KeycloakAdminService keycloakAdminService;
     @Mock private ReportService reportService;
     @Mock private NotificationService notificationService;
@@ -47,6 +50,14 @@ public class TicketArchiveServiceTest {
 
     @BeforeEach
     void setUp() {
+        // camundaEnabled is a @Value-injected field and camundaService is a plain @Autowired
+        // field (not a constructor param) - Mockito's @InjectMocks only performs constructor
+        // injection here, so both are left at their Java defaults (false / null) unless wired
+        // explicitly. Left unset, enqueueWorkflowSync() silently no-ops (camundaEnabled=false),
+        // which is why testCloseTicketSuccess previously saw zero interactions on workflowSyncService.
+        ReflectionTestUtils.setField(ticketService, "camundaEnabled", true);
+        ReflectionTestUtils.setField(ticketService, "camundaService", camundaService);
+
         testClient = new Client();
         testClient.setId(1L);
         testClient.setCompanyName("Test Client");
@@ -165,7 +176,6 @@ public class TicketArchiveServiceTest {
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(testTicket));
         when(ticketRepository.saveAndFlush(testTicket)).thenReturn(testTicket);
         doNothing().when(reportService).archiveToAlfresco(testTicket);
-        doNothing().when(camundaAsyncService).completeValidationTaskAsync(testTicket, true);
         doNothing().when(notificationService).notifyStatusChanged(testTicket, TicketStatus.CLOSED);
         doNothing().when(notificationService).broadcastTicketStatusChange(any(), any(), any());
 
@@ -176,6 +186,8 @@ public class TicketArchiveServiceTest {
         assertEquals(5, result.getSatisfactionRating());
         verify(reportService, times(1)).archiveToAlfresco(testTicket);
         verify(ticketRepository, atLeast(2)).saveAndFlush(testTicket);
+        verify(workflowSyncService).enqueue(eq(testTicket), eq(WorkflowSyncAction.CLOSE), eq("true"), anyString());
+        verify(workflowSyncService).enqueue(eq(testTicket), eq(WorkflowSyncAction.ARCHIVE), isNull(), anyString());
     }
 
     /**

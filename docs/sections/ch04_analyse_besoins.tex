@@ -1,0 +1,107 @@
+﻿\chapter{Analyse des besoins}
+
+\section{Identification des acteurs}
+
+SupportFlow distingue quatre categories d'acteurs principales. Cette distinction structure tout le reste de l'application, depuis les routes frontend jusqu'aux controles backend.
+
+\subsection{Le client}
+
+Le client cree des tickets, consulte les tickets rattaches a son perimetre, lit les commentaires publics, ajoute des informations complementaires et valide ou refuse la resolution. Son role est volontairement borne : il doit pouvoir suivre l'etat de sa demande sans acceder a des informations internes au support.
+
+\subsection{L'agent support}
+
+L'agent traite les tickets qui lui sont assignes. Il peut analyser le probleme, ajouter des commentaires internes ou publics, joindre des pieces, prendre en charge un ticket, le resoudre et l'escalader si necessaire. Il est au coeur du traitement quotidien.
+
+\subsection{Le manager support}
+
+Le manager supervise la file de tickets. Il assigne les dossiers, arbitre les priorites, demande des revues manager, agit sur le SLA, gere les utilisateurs dans son perimetre et prend les decisions d'escalade. Son role est central pour la qualite de service.
+
+\subsection{L'administrateur}
+
+L'administrateur dispose d'un acces etendu. Il gere les utilisateurs, les clients, les configurations, les problemes de synchronisation et les actions exceptionnelles. C'est aussi lui qui intervient sur l'infrastructure et la maintenance de l'ecosysteme.
+
+\section{Besoins fonctionnels}
+
+Les besoins fonctionnels du systeme peuvent etre organises en sous-domaines.
+
+\subsection{Gestion des tickets}
+
+Le systeme doit permettre de creer, modifier, consulter, rechercher, filtrer et suivre des tickets. Chaque ticket doit porter des informations essentielles : reference, titre, description, client, categorie, priorite, severite, impact, agent assigne, statut, date de creation, date de mise a jour, SLA et historique.
+
+\subsection{Traitement et workflow}
+
+Le systeme doit rendre explicite le cycle de vie du ticket. Les etapes principales sont la qualification, l'assignation, la resolution, la validation client et l'archivage. Les transitions doivent etre controlees pour eviter des combinaisons incoherentes comme une assignation sur un ticket finalise ou une resolution sans agent responsable.
+
+\subsection{Communication et collaboration}
+
+Le systeme doit gerer des commentaires, des notifications et des pieces jointes. Les communications doivent distinguer ce qui est public et ce qui est interne. Les acteurs doivent etre informes en temps reel ou quasi temps reel des changements importants.
+
+\subsection{Pilotage et supervision}
+
+Le projet doit proposer un tableau de bord, des indicateurs de performance, une vision des tickets a risque, des alertes SLA et une capacite d'escalade. L'outil doit soutenir la decision manageriale.
+
+\subsection{Archivage et rapports}
+
+Une fois le ticket clos, le systeme doit etre capable de produire des rapports et d'archiver les elements utiles dans une GED. Cette dimension est importante pour l'audit, la conformite et la capitalisation.
+
+\subsection{Aide intelligente}
+
+Le systeme doit offrir une assistance intelligente qui n'interfere pas avec les transactions critiques. L'IA ne doit pas etre bloquante pour le fonctionnement normal, mais doit etre capable de fournir un gain d'efficacite lorsqu'elle est disponible.
+
+\section{Besoins non fonctionnels}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}p{10.5cm}}
+\toprule
+Categorie & Exigence \\
+\midrule
+Performance & Les operations metier essentielles, notamment la creation de ticket et la consultation, doivent rester fluides meme lorsque des traitements annexes sont lents. \\
+Securite & L'application doit authentifier les utilisateurs via Keycloak, proteger les endpoints et appliquer des autorisations metier fines. \\
+Disponibilite & Le systeme doit pouvoir redemarrer ses services Docker et reconstituer un environnement coherent. \\
+Tracabilite & Les actions importantes doivent laisser une trace exploitable. \\
+Extensibilite & Les modules doivent etre assez decouples pour permettre l'ajout de nouvelles regles metier. \\
+Demonstrabilite & Le projet doit pouvoir etre montre facilement en local avec un jeu de donnees significatif. \\
+Maintenabilite & Le code doit etre structure en couches avec des services specialises. \\
+\bottomrule
+\end{longtable}
+
+\section{Cas d'usage majeurs}
+
+\subsection{Cas d'usage 1 : creation d'un ticket}
+
+Un utilisateur cree un ticket depuis l'interface. Il renseigne au minimum le client, le titre, la description et les informations necessaires a la priorisation. Le backend enregistre le ticket, calcule les attributs derives si necessaire, declenche le workflow Camunda, puis renvoie une reponse immediate au frontend. Des traitements annexes, comme les notifications ou certains declencheurs de workflow, peuvent etre deportes en asynchrone pour ne pas ralentir l'experience utilisateur.
+
+\subsection{Cas d'usage 2 : qualification et assignation}
+
+Le manager ouvre le ticket, l'evalue et decide quel agent doit en prendre la charge. L'interface d'assignation peut proposer une shortlist ou une liste complete avec etats d'eligibilite. Le backend verifie que l'action est autorisee et que le ticket est dans un etat compatible.
+
+\subsection{Cas d'usage 3 : traitement par l'agent}
+
+L'agent consulte les details du ticket, ajoute des commentaires, joint des documents, fait progresser l'investigation et soumet une resolution. Durant cette phase, le SLA doit etre surveille. Des alertes doivent remonter si le ticket devient a risque.
+
+\subsection{Cas d'usage 4 : validation client}
+
+Le client consulte la resolution. S'il l'accepte, le ticket peut progresser vers la cloture et l'archivage. S'il la rejette, le workflow doit revenir vers une etape de traitement.
+
+\subsection{Cas d'usage 5 : escalade}
+
+Lorsqu'un ticket devient critique, bloque ou depasse les delais, le systeme doit soit suggerer une escalation, soit la declencher selon les regles. L'historique doit permettre de comprendre pourquoi un ticket a ete reoriente.
+
+\section{Regles metier importantes}
+
+Les regles metier structurent le coeur du projet. Parmi les plus significatives :
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item un ticket finalise ne doit plus pouvoir etre assigne ;
+  \item un agent ne doit pas resoudre un ticket qui ne lui est pas attribue ;
+  \item un client ne peut agir que sur son perimetre ;
+  \item un manager peut superviser, reassigner et declencher certaines actions de controle ;
+  \item le SLA doit etre surveille tout au long du traitement ;
+  \item la validation client conditionne la cloture definitive du workflow ;
+  \item les actions critiques doivent rester coherentes entre l'interface et le backend.
+\end{itemize}
+
+\section{Valeur metier de la solution}
+
+SupportFlow apporte une valeur metier sur trois niveaux. Au niveau operationnel, il aide les equipes support a traiter les tickets avec plus de clarte. Au niveau manager, il rend visible la charge, les risques et les blocages. Au niveau client, il renforce la transparence et la confiance en montrant l'etat d'avancement du dossier. Ces trois niveaux font de SupportFlow un outil transverse qui aligne les objectifs du support, de l'encadrement et des utilisateurs finaux.
+
+

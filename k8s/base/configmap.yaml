@@ -4,7 +4,13 @@ metadata:
   name: supportflow-config
   namespace: supportflow
 data:
-  SPRING_PROFILES_ACTIVE: k8s
+  # "docker" first so its parameterized spring.datasource/mail/jpa config (driven by
+  # DB_HOST/DB_PORT/DB_NAME/MAIL_HOST below) applies in the cluster too; "k8s" layers on top,
+  # overriding only what actually differs here (Keycloak issuer/JWK URIs). Previously this was
+  # just "k8s" alone, whose own application-k8s.yml has no datasource block at all - the pod
+  # silently inherited the base profile's hardcoded jdbc:mysql://localhost:3306/... and would
+  # crash-loop on connect instead of reaching supportflow-mysql.
+  SPRING_PROFILES_ACTIVE: docker,k8s
   DB_HOST: supportflow-mysql
   DB_PORT: "3306"
   DB_NAME: supportflow_db
@@ -12,4 +18,5 @@ data:
   KEYCLOAK_JWK_URI: http://supportflow-keycloak:8080/realms/supportflow/protocol/openid-connect/certs
   ALFRESCO_URL: http://supportflow-alfresco:8080/alfresco/api/-default-/public/cmis/versions/1.1/atom
   AI_AGENT_URL: http://supportflow-ai-agent:8000
+  SUPPORTFLOW_ALLOWED_ORIGINS: http://localhost:30088,http://supportflow-staging.local,https://supportflow.example.com
   TZ: Africa/Tunis

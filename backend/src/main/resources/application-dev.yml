@@ -8,6 +8,8 @@ server:
     context-path: /api
 
 spring:
+  flyway:
+    enabled: false
   application:
     name: SupportFlow-Dev
     
@@ -61,6 +63,10 @@ jwt:
 # SLA Configuration
 # ===============================================
 supportflow:
+  security:
+    allowed-origins: ${SUPPORTFLOW_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
+  workflow:
+    camunda-enabled: false
   sla:
     critical-hours: 4
     high-hours: 8

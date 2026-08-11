@@ -1,8 +1,12 @@
 package com.supportflow.entity;
 
+import com.supportflow.entity.enums.ChangeType;
+import com.supportflow.entity.enums.TicketHistoryAction;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Entité Historique des modifications du ticket
@@ -18,10 +22,12 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @SuperBuilder
 public class TicketHistory extends BaseEntity {
-    
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "action", nullable = false, length = 50)
-    private String action;
-    
+    private TicketHistoryAction action;
+
     @Column(name = "field_name", length = 50)
     private String fieldName;
     
@@ -44,8 +50,10 @@ public class TicketHistory extends BaseEntity {
     @Column(name = "user_agent", length = 255)
     private String userAgent;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "change_type", length = 20)
-    private String changeType;
+    private ChangeType changeType;
     
     // Relations
     @ManyToOne(fetch = FetchType.LAZY)
@@ -61,7 +69,8 @@ public class TicketHistory extends BaseEntity {
         return TicketHistory.builder()
             .ticket(ticket)
             .user(user)
-            .action("STATUS_CHANGE")
+            .action(TicketHistoryAction.STATUS_CHANGE)
+            .changeType(ChangeType.STATUS_CHANGE)
             .fieldName("status")
             .oldValue(oldStatus)
             .newValue(newStatus)
@@ -69,7 +78,7 @@ public class TicketHistory extends BaseEntity {
             .performedBy(user != null ? user.getFullName() : "System")
             .build();
     }
-    
+
     public static TicketHistory createAssignment(Ticket ticket, User performedBy, User assignedTo) {
         return createAssignment(ticket, performedBy, assignedTo, null);
     }
@@ -79,7 +88,8 @@ public class TicketHistory extends BaseEntity {
         return TicketHistory.builder()
             .ticket(ticket)
             .user(performedBy)
-            .action(aiValidated ? "ASSIGNMENT_AI_VALIDATED" : "ASSIGNMENT")
+            .action(aiValidated ? TicketHistoryAction.ASSIGNMENT_AI_VALIDATED : TicketHistoryAction.ASSIGNMENT)
+            .changeType(ChangeType.ASSIGNMENT)
             .fieldName("assignedAgent")
             .newValue(assignedTo != null ? assignedTo.getFullName() : null)
             .description(aiValidated
@@ -93,29 +103,32 @@ public class TicketHistory extends BaseEntity {
         return TicketHistory.builder()
             .ticket(ticket)
             .user(user)
-            .action("COMMENT_ADDED")
+            .action(TicketHistoryAction.COMMENT_ADDED)
+            .changeType(ChangeType.COMMENT)
             .description("Nouveau commentaire ajouté")
             .performedBy(user != null ? user.getFullName() : "System")
             .build();
     }
-    
+
     public static TicketHistory createAttachment(Ticket ticket, User user, String fileName) {
         return TicketHistory.builder()
             .ticket(ticket)
             .user(user)
-            .action("ATTACHMENT_ADDED")
+            .action(TicketHistoryAction.ATTACHMENT_ADDED)
+            .changeType(ChangeType.ATTACHMENT)
             .fieldName("attachment")
             .newValue(fileName)
             .description("Pièce jointe ajoutée: " + fileName)
             .performedBy(user != null ? user.getFullName() : "System")
             .build();
     }
-    
+
     public static TicketHistory createCreation(Ticket ticket, User user) {
         return TicketHistory.builder()
             .ticket(ticket)
             .user(user)
-            .action("CREATED")
+            .action(TicketHistoryAction.CREATED)
+            .changeType(ChangeType.FIELD_CHANGE)
             .description("Ticket créé")
             .performedBy(user != null ? user.getFullName() : "System")
             .build();

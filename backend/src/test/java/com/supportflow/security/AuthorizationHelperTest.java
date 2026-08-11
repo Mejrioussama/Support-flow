@@ -34,7 +34,6 @@ class AuthorizationHelperTest {
     @Mock private TicketRepository ticketRepository;
     @Mock private ClientService clientService;
 
-    @InjectMocks
     private AuthorizationHelper authHelper;
 
     private Jwt adminJwt;
@@ -45,6 +44,12 @@ class AuthorizationHelperTest {
 
     @BeforeEach
     void setUp() {
+        authHelper = new AuthorizationHelper(
+            userIdentityService,
+            userRepository,
+            ticketRepository,
+            clientService,
+            new KeycloakRoleExtractor());
         adminJwt = buildJwt(List.of("ADMIN"));
         managerJwt = buildJwt(List.of("SUPPORT_MANAGER"));
         agentJwt = buildJwt(List.of("SUPPORT_AGENT"));
@@ -141,6 +146,20 @@ class AuthorizationHelperTest {
             assertFalse(authHelper.isAdmin(nullRolesJwt));
             assertFalse(authHelper.isStaff(nullRolesJwt));
             assertFalse(authHelper.isClient(nullRolesJwt));
+        }
+
+        @Test
+        @DisplayName("Roles from unrelated Keycloak clients must not grant access")
+        void unrelatedClientRole_isIgnored() {
+            Jwt unrelatedClientJwt = Jwt.withTokenValue("token")
+                .header("alg", "RS256")
+                .claim("sub", "user")
+                .claim("resource_access", Map.of(
+                    "unrelated-client", Map.of("roles", List.of("ADMIN"))))
+                .build();
+
+            assertFalse(authHelper.isAdmin(unrelatedClientJwt));
+            assertFalse(authHelper.isStaff(unrelatedClientJwt));
         }
     }
 
