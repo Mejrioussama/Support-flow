@@ -192,11 +192,20 @@ services:
   # ============================================
   # ALFRESCO (GED)
   # ============================================
+  # ── GED (profil "ged") ──────────────────────────────────────────────────────
+  # The Alfresco stack costs ~1.4 GB across three containers but is only needed to
+  # demonstrate document archiving. The backend does not depend on it: it is absent from
+  # backend.depends_on, AlfrescoCmisService opens its CMIS session lazily (no @PostConstruct)
+  # and is injected with required=false, so the application starts and runs normally without
+  # it - only the archiving features are unavailable. Keeping it opt-in makes the default
+  # `docker compose up` markedly lighter on developer machines.
+  # Start it with: docker compose --profile ged up -d
   alfresco-postgres:
     image: postgres:14
     container_name: supportflow-alfresco-postgres
     restart: unless-stopped
     logging: *default-logging
+    profiles: ["ged"]
     environment:
       POSTGRES_DB: alfresco
       POSTGRES_USER: alfresco
@@ -223,6 +232,7 @@ services:
     user: "0:0"
     restart: unless-stopped
     logging: *default-logging
+    profiles: ["ged"]
     environment:
       JAVA_OPTS: >-
         -Xms512m -Xmx1024m
@@ -273,6 +283,7 @@ services:
     container_name: supportflow-alfresco-share
     restart: unless-stopped
     logging: *default-logging
+    profiles: ["ged"]
     environment:
       REPO_HOST: alfresco
       REPO_PORT: 8080
