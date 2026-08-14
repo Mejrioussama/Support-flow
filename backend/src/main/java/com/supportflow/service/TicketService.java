@@ -85,6 +85,8 @@ public class TicketService implements TicketLifecycleOperations {
    private TicketReferenceSequenceRepository ticketReferenceSequenceRepository;
    @Autowired(required = false)
    private AlfrescoCmisService alfrescoCmisService;
+   @Autowired(required = false)
+   private AICopilotService aiCopilotService;
 
    @Value("${supportflow.workflow.camunda-enabled:true}")
    private boolean camundaEnabled;
@@ -211,6 +213,7 @@ public class TicketService implements TicketLifecycleOperations {
       this.supportCategoryService.normalizeTicketCategory(ticket);
       ticket.calculateScore();
       ticket = (Ticket)this.ticketRepository.save(ticket);
+      this.schedulePrecomputeCopilot(ticket.getId());
       log.info("Ticket mis à jour: {}", ticket.getReference());
       return this.mapper.toTicketResponseDTO(ticket);
    }
@@ -1487,6 +1490,21 @@ public class TicketService implements TicketLifecycleOperations {
       this.runAfterCommit(() -> {
          this.camundaAsyncService.notifyTicketCreatedAsync(ticketId);
       });
+      this.schedulePrecomputeCopilot(ticketId);
+   }
+
+   /**
+    * Warms the AI copilot cache in the background right after a ticket is created or edited,
+    * so the ~30s CPU-only LLM generation usually happens before an agent opens the ticket
+    * instead of while they wait. Best-effort: never blocks the request and any failure is
+    * swallowed inside AICopilotService, since a missing precompute just falls back to the
+    * normal on-demand path in AIAssistantController.
+    */
+   private void schedulePrecomputeCopilot(Long ticketId) {
+      if (this.aiCopilotService == null) {
+         return;
+      }
+      this.runAfterCommit(() -> this.aiCopilotService.precomputeAsync(ticketId));
    }
 
    private void enqueueWorkflowSync(Ticket ticket, WorkflowSyncAction action, String payload, String eventKey) {
