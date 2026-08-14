@@ -85,8 +85,18 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     @Query("SELECT t FROM Ticket t WHERE t.slaDeadline BETWEEN :now AND :warningTime " +
            "AND t.slaWarningSent = false " +
            "AND t.status NOT IN ('RESOLVED', 'CLOSED', 'CANCELLED')")
-    List<Ticket> findTicketsApproachingSla(@Param("now") LocalDateTime now, 
+    List<Ticket> findTicketsApproachingSla(@Param("now") LocalDateTime now,
                                            @Param("warningTime") LocalDateTime warningTime);
+
+    // Backs the AI assistant's "which tickets need attention?" answer directly from the
+    // database instead of asking the LLM: on CPU-only inference the model needed ~30s to
+    // answer and could still hallucinate references. agentId scopes the result to one agent's
+    // own workload; pass null for managers/admins who legitimately see the whole backlog.
+    @Query("SELECT t FROM Ticket t WHERE t.status NOT IN ('RESOLVED', 'CLOSED', 'CANCELLED') " +
+           "AND (t.slaBreached = true OR t.priority IN ('SUPER_CRITICAL', 'CRITICAL')) " +
+           "AND (:agentId IS NULL OR t.assignedAgent.id = :agentId) " +
+           "ORDER BY t.slaBreached DESC, t.slaDeadline ASC")
+    List<Ticket> findTicketsNeedingAttention(@Param("agentId") Long agentId, Pageable pageable);
     
     // Recherche textuelle
     @Query("SELECT t FROM Ticket t WHERE " +

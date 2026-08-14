@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, timeout } from 'rxjs';
 import { environment } from '@env/environment';
 import { UserSummary } from '../models';
+import { AuthService } from './auth.service';
 
 export interface AIStatus {
   status: string;
@@ -141,7 +142,7 @@ export class AIService {
   private readonly AI_TIMEOUT = 300_000; // 5 min (CPU-only Ollama is slow)
   private readonly ASSIGNMENT_TIMEOUT = 15_000; // assignment must degrade fast to fallback UX
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private authService: AuthService) {}
 
   getStatus(): Observable<AIStatus> {
     return this.http.get<AIStatus>(`${this.apiUrl}/status`).pipe(timeout(10_000));
@@ -185,6 +186,82 @@ export class AIService {
       ticketId: ticketId || null,
       history: history || []
     }).pipe(timeout(this.AI_TIMEOUT));
+  }
+
+  /**
+   * Streams a chat answer token by token over Server-Sent Events.
+   *
+   * Generation is the bulk of the wait on CPU-only inference, so showing tokens as they
+   * arrive puts the first words on screen in well under a second instead of leaving the
+   * user on a spinner for the whole answer. fetch + ReadableStream is used rather than
+   * EventSource because EventSource cannot carry the Authorization header.
+   *
+   * onToken receives incremental text; the returned promise resolves with the final
+   * metadata, whose `answer` is authoritative (reasoning models strip <think> blocks only
+   * once the full text is known).
+   */
+  async chatStream(
+    message: string,
+    onToken: (chunk: string) => void,
+    ticketId?: number,
+    history?: { role: string; content: string }[],
+    signal?: AbortSignal
+  ): Promise<AIChatResponse> {
+    const token = await this.authService.getToken();
+    const response = await fetch(`${this.apiUrl}/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ message, ticketId: ticketId || null, history: history || [] }),
+      signal
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Chat stream failed: HTTP ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let final: AIChatResponse | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE frames are separated by a blank line; keep the trailing partial frame in the
+      // buffer until its terminator arrives.
+      const frames = buffer.split('\n\n');
+      buffer = frames.pop() ?? '';
+
+      for (const frame of frames) {
+        let event = 'message';
+        let data = '';
+        for (const line of frame.split('\n')) {
+          if (line.startsWith('event: ')) event = line.slice(7).trim();
+          else if (line.startsWith('data: ')) data += line.slice(6);
+        }
+        if (!data) continue;
+
+        const payload = JSON.parse(data);
+        if (event === 'token' && payload.content) {
+          onToken(payload.content);
+        } else if (event === 'done') {
+          final = payload as AIChatResponse;
+        } else if (event === 'error') {
+          throw new Error(payload.detail || 'Erreur de streaming IA');
+        }
+      }
+    }
+
+    if (!final) {
+      throw new Error('Flux IA interrompu avant la fin de la reponse');
+    }
+    return final;
   }
 
   generateKbArticle(ticketId: number): Observable<AIKnowledgeDraft> {

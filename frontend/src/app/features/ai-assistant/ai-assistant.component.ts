@@ -136,7 +136,9 @@ interface ChatMessage {
                   </div>
                 </div>
               }
-              @if (chatLoading) {
+              <!-- Only shown until the first streamed token lands: past that point the
+                   answer bubble itself is the progress indicator. -->
+              @if (chatLoading && !isStreamingIntoLastMessage()) {
                 <div class="chat-msg assistant">
                   <div class="msg-avatar">
                     <mat-icon>smart_toy</mat-icon>
@@ -822,25 +824,40 @@ export class AIAssistantComponent implements OnInit, AfterViewChecked {
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .map(m => ({ role: m.role, content: m.content }));
 
-    this.aiService.chat(text, contextTicketId, history).subscribe({
-      next: (res) => {
-        this.chatMessages.push({
-          role: 'assistant', content: res.answer, timestamp: new Date(),
-          duration: res.duration_s, model: res.model
-        });
-        this.chatLoading = false;
-        this.shouldScrollChat = true;
-      },
-      error: (err) => {
-        this.chatMessages.push({
-          role: 'assistant',
-          content: 'Erreur: Impossible de contacter l\'IA. Vérifiez que le service est en ligne.',
-          timestamp: new Date()
-        });
-        this.chatLoading = false;
-        this.shouldScrollChat = true;
-      }
-    });
+    // The assistant bubble is created empty up front and filled as tokens arrive, so the
+    // answer starts appearing in well under a second instead of after the full generation.
+    const streamed: ChatMessage = {
+      role: 'assistant', content: '', timestamp: new Date()
+    };
+    this.chatMessages.push(streamed);
+
+    try {
+      const final = await this.aiService.chatStream(
+        text,
+        (chunk) => {
+          streamed.content += chunk;
+          this.shouldScrollChat = true;
+        },
+        contextTicketId,
+        history
+      );
+      // The final payload is authoritative: reasoning models can only have their <think>
+      // blocks stripped once the whole text is known, so it may differ from what streamed.
+      streamed.content = final.answer;
+      streamed.duration = final.duration_s;
+      streamed.model = final.model;
+    } catch (err) {
+      streamed.content = 'Erreur: Impossible de contacter l\'IA. Vérifiez que le service est en ligne.';
+    } finally {
+      this.chatLoading = false;
+      this.shouldScrollChat = true;
+    }
+  }
+
+  /** True once the in-flight answer has started streaming text into its bubble. */
+  isStreamingIntoLastMessage(): boolean {
+    const last = this.chatMessages[this.chatMessages.length - 1];
+    return !!last && last.role === 'assistant' && last.content.length > 0;
   }
 
   askSuggestion(text: string): void {

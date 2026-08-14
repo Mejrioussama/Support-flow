@@ -5,6 +5,7 @@ Assistant IA pour agents de support et managers.
 
 import os
 import re
+import json
 import time
 import asyncio
 import logging
@@ -15,6 +16,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -31,15 +33,17 @@ SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", (
     "Réponds toujours en français, de manière structurée, concise et actionnable."
 ))
 
+# Kept deliberately short: this block is re-processed on every chat turn, and prompt
+# evaluation is the dominant cost on CPU-only inference (~16 tok/s). The status, severity
+# and role enumerations that used to live here are already served instantly and exactly by
+# _answer_supportflow_fact, so carrying them in every prompt cost seconds per message to
+# restate what the deterministic path answers better.
 SUPPORTFLOW_KNOWLEDGE = """
 Connaissance produit SupportFlow:
-- SupportFlow est une plateforme de gestion de tickets de support.
-- Les rôles principaux sont: ADMIN, SUPPORT_MANAGER, SUPPORT_AGENT et CLIENT.
-- Le produit contient notamment des modules tickets, clients, utilisateurs, archives/reports et un assistant IA.
-- Les statuts de ticket connus incluent: NEW, OPEN, ASSIGNED, IN_PROGRESS, PENDING, ESCALATED_MANUAL, ESCALATED_SLA, RESOLVED, CLOSED, CANCELLED.
-- Les niveaux de sévérité connus incluent: SUPER_CRITICAL, CRITICAL, HIGH, MEDIUM, LOW.
-- L'assistant IA peut aider sur: analyse de ticket, diagnostic, suggestion de réponse client, résumé d'escalade, analyse de tendances et génération d'article KB.
-- Quand une information produit n'est pas confirmée par le contexte fourni, il faut le dire clairement au lieu d'inventer.
+- Plateforme de gestion de tickets de support IT.
+- Rôles: ADMIN, SUPPORT_MANAGER, SUPPORT_AGENT, CLIENT.
+- L'assistant IA couvre: analyse et diagnostic de ticket, suggestion de réponse client, résumé d'escalade, tendances, article KB.
+- N'affirme rien qui ne soit confirmé par le contexte fourni.
 """.strip()
 
 # Models that don't support system role (reasoning models with <think> blocks)
@@ -90,12 +94,12 @@ def _build_chat_system_context(req: "ChatRequest") -> str:
     base = (
         "Tu es SupportFlow AI. Tu réponds toujours en français.\n"
         "Règles:\n"
-        "- Si la question est générale, réponds normalement avec une explication claire, courte et utile.\n"
-        "- Si la question porte sur SupportFlow, appuie-toi sur la connaissance produit fournie ci-dessous.\n"
-        "- Si un ticket est fourni, priorise le contexte du ticket et propose des actions concrètes.\n"
-        "- N'invente pas de fonctionnalité, de donnée, de statut ou de résultat absent du contexte.\n"
-        "- Si une information manque, dis-le explicitement et précise ce qu'il faudrait vérifier.\n"
-        "- Quand c'est pertinent, structure la réponse en étapes ou en points courts.\n\n"
+        "- Si un ticket est fourni, priorise son contexte et propose des actions concrètes.\n"
+        "- N'invente rien: si une information manque, dis-le et précise quoi vérifier.\n"
+        # Length is the dominant latency factor on CPU-only inference: every extra sentence
+        # costs roughly a second of the user's time, so brevity here is a performance rule
+        # as much as a style one.
+        "- Sois bref: 5 phrases maximum, ou 5 puces courtes. Pas de préambule ni de conclusion.\n\n"
         f"{SUPPORTFLOW_KNOWLEDGE}"
     )
 
@@ -235,8 +239,14 @@ def _get_http_client() -> httpx.AsyncClient:
     return _http_client
 
 
-async def llm(prompt: str, system: str | None = None, temperature: float | None = None) -> dict:
-    """Appelle Ollama et retourne la réponse + métadonnées."""
+async def llm(prompt: str, system: str | None = None, temperature: float | None = None,
+              max_tokens: int | None = None) -> dict:
+    """Appelle Ollama et retourne la réponse + métadonnées.
+
+    max_tokens caps generation for this call only. It is a safety net rather than the main
+    speed lever: the model normally stops well before the cap, so what actually controls
+    latency is how much output the prompt asks for.
+    """
     t0 = time.time()
     try:
         resp = await _get_http_client().post("/api/chat", json={
@@ -245,7 +255,7 @@ async def llm(prompt: str, system: str | None = None, temperature: float | None 
             "stream": False,
             "options": {
                 "temperature": temperature or AI_TEMPERATURE,
-                "num_predict": AI_MAX_TOKENS,
+                "num_predict": max_tokens or AI_MAX_TOKENS,
                 "num_ctx": AI_NUM_CTX,
                 "num_thread": 4,
             },
@@ -492,27 +502,32 @@ TICKET:
 - Créé le: {t.created_at or 'Non précisé'}
 {comments_ctx}{kb_ctx}
 
+Style: télégraphique. Aucune introduction, aucune conclusion, ne répète pas les données du ticket.
 Réponds STRICTEMENT avec ces sections et rien d'autre:
 SUMMARY:
-[résumé métier en 2 à 4 phrases]
+[2 phrases maximum]
 
 LIKELY_CAUSE:
-[cause probable ou hypothèse principale]
+[1 phrase]
 
 NEXT_ACTIONS:
-[3 actions courtes séparées par " | "]
+[3 actions de 8 mots maximum, séparées par " | "]
 
 CUSTOMER_REPLY:
-[réponse prête à envoyer au client en 2 à 4 phrases]
+[2 phrases maximum]
 
 RISKS:
-[risques ou points de vigilance séparés par " | "]
+[2 risques de 8 mots maximum, séparés par " | "]
 
 KB_HINTS:
-[articles, mots-clés ou pistes utiles séparés par " | "]
+[3 mots-clés maximum, séparés par " | "]
 """
 
-    result = await llm(prompt)
+    # Generation dominates latency on CPU-only inference (~72% of wall clock), and output
+    # length is driven by how much the prompt asks for. The brevity constraints above plus
+    # this cap keep the briefing near ~200 tokens instead of the ~415 the verbose template
+    # produced, without dropping any of the six sections the UI renders.
+    result = await llm(prompt, max_tokens=600)
     parsed = _parse_sections(result["answer"], [
         "SUMMARY",
         "LIKELY_CAUSE",
@@ -748,22 +763,22 @@ Fournis:
 
 # ── 6. Chat libre ────────────────────────────────────────────────────────────
 
-@app.post("/chat")
-async def chat(req: ChatRequest):
-    """Conversation libre avec contexte SupportFlow."""
-    fact_answer = None if req.ticket else _answer_supportflow_fact(req.message)
-    if fact_answer:
-        return {
-            "question": req.message,
-            "answer": fact_answer,
-            "ticket_context": None,
-            "model": "supportflow-facts",
-            "duration_s": 0.0,
-            "responded_at": datetime.now().isoformat(),
-        }
+def _sse(event: str, data: dict) -> str:
+    """Format one Server-Sent Event frame.
 
+    ensure_ascii keeps accented French intact through the wire, and the trailing blank
+    line is what actually terminates a frame for the browser's parser.
+    """
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _build_chat_messages(req: "ChatRequest") -> list[dict[str, str]]:
+    """Assemble the message list for a chat turn.
+
+    Shared by /chat and /chat/stream so the streamed answer is produced from exactly the
+    same context as the buffered one - the two must not drift apart.
+    """
     system_context = _build_chat_system_context(req)
-
     messages: list[dict[str, str]] = []
 
     # System prompt natif ou hack selon le modèle
@@ -779,6 +794,105 @@ async def chat(req: ChatRequest):
             messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
         messages.append({"role": "user", "content": req.message})
 
+    return messages
+
+
+@app.post("/chat/stream")
+async def chat_stream(req: ChatRequest):
+    """Server-Sent Events variant of /chat.
+
+    Generation is ~92% of a chat turn's latency on CPU-only inference while prompt
+    evaluation is under a second, so emitting tokens as they are produced puts the first
+    words on screen almost immediately instead of after the whole answer is ready. The
+    deterministic fact path is still answered in one shot: it is already instant, and
+    streaming it would only add complexity.
+
+    Event protocol: `token` carries an incremental chunk, `done` carries the final
+    metadata, `error` carries a failure. Every payload is JSON.
+    """
+    fact_answer = None if req.ticket else _answer_supportflow_fact(req.message)
+
+    async def event_stream():
+        if fact_answer:
+            yield _sse("token", {"content": fact_answer})
+            yield _sse("done", {
+                "question": req.message,
+                "answer": fact_answer,
+                "ticket_context": None,
+                "model": "supportflow-facts",
+                "duration_s": 0.0,
+                "responded_at": datetime.now().isoformat(),
+            })
+            return
+
+        messages = _build_chat_messages(req)
+        t0 = time.time()
+        chunks: list[str] = []
+        try:
+            async with _get_http_client().stream("POST", "/api/chat", json={
+                "model": OLLAMA_MODEL,
+                "messages": messages,
+                "stream": True,
+                "options": {"temperature": AI_TEMPERATURE, "num_predict": 400,
+                            "num_ctx": AI_NUM_CTX, "num_thread": 4},
+                "keep_alive": "60m",
+            }) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        payload = json.loads(line)
+                    except ValueError:
+                        continue
+                    piece = payload.get("message", {}).get("content", "")
+                    if piece:
+                        chunks.append(piece)
+                        yield _sse("token", {"content": piece})
+                    if payload.get("done"):
+                        break
+        except Exception as exc:
+            log.error("Ollama stream error: %s", exc)
+            yield _sse("error", {"detail": f"Ollama indisponible: {exc}"})
+            return
+
+        elapsed = round(time.time() - t0, 2)
+        # Reasoning models emit <think> blocks that must not reach the user. They are only
+        # strippable once the full text is known, so the final answer is re-sent here and
+        # the client replaces what it streamed when this differs from the concatenation.
+        answer = _strip_think("".join(chunks))
+        log.info("Chat stream completed in %ss (%d chars)", elapsed, len(answer))
+        yield _sse("done", {
+            "question": req.message,
+            "answer": answer,
+            "ticket_context": req.ticket.id if req.ticket else None,
+            "model": OLLAMA_MODEL,
+            "duration_s": elapsed,
+            "responded_at": datetime.now().isoformat(),
+        })
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",  # keeps nginx from buffering the stream into one blob
+    })
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest):
+    """Conversation libre avec contexte SupportFlow."""
+    fact_answer = None if req.ticket else _answer_supportflow_fact(req.message)
+    if fact_answer:
+        return {
+            "question": req.message,
+            "answer": fact_answer,
+            "ticket_context": None,
+            "model": "supportflow-facts",
+            "duration_s": 0.0,
+            "responded_at": datetime.now().isoformat(),
+        }
+
+    messages = _build_chat_messages(req)
+
     elapsed = 0.0
     t0 = time.time()
     try:
@@ -786,7 +900,10 @@ async def chat(req: ChatRequest):
             "model": OLLAMA_MODEL,
             "messages": messages,
             "stream": False,
-            "options": {"temperature": AI_TEMPERATURE, "num_predict": AI_MAX_TOKENS, "num_ctx": AI_NUM_CTX, "num_thread": 4},
+            # A chat turn that runs to the full 2048-token budget costs ~80s on CPU-only
+            # inference, which reads as a hang. Capping generation keeps a turn near ~25s;
+            # the brevity instruction in the system context is what usually stops it earlier.
+            "options": {"temperature": AI_TEMPERATURE, "num_predict": 400, "num_ctx": AI_NUM_CTX, "num_thread": 4},
             "keep_alive": "60m",
         })
         resp.raise_for_status()
