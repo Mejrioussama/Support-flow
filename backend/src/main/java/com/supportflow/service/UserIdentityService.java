@@ -5,6 +5,7 @@ import com.supportflow.entity.enums.Role;
 import com.supportflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
@@ -115,7 +116,14 @@ public class UserIdentityService {
     private User attachKeycloakIdIfMissing(User user, String keycloakId) {
         if (user.getKeycloakId() == null && keycloakId != null) {
             user.setKeycloakId(keycloakId);
-            return userRepository.save(user);
+            try {
+                return userRepository.save(user);
+            } catch (ObjectOptimisticLockingFailureException e) {
+                // Another concurrent request (e.g. parallel page-load calls) already attached the
+                // keycloakId to this row first, bumping its version. That request's write already
+                // satisfies our goal here, so reload the current row instead of failing the request.
+                return userRepository.findById(user.getId()).orElse(user);
+            }
         }
         return user;
     }

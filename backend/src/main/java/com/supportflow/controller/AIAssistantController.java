@@ -5,6 +5,7 @@ import com.supportflow.dto.TicketAssignmentPreviewRequestDTO;
 import com.supportflow.entity.*;
 import com.supportflow.repository.*;
 import com.supportflow.security.AuthorizationHelper;
+import com.supportflow.service.AICopilotService;
 import com.supportflow.service.TicketService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +18,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
@@ -46,9 +50,21 @@ public class AIAssistantController {
     private final EscalationEventRepository escalationEventRepository;
     private final AuthorizationHelper authHelper;
     private final TicketService ticketService;
+    private final AICopilotService aiCopilotService;
+    private final ObjectMapper objectMapper;
 
     private RestTemplate restTemplate;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /**
+     * Matches the "what needs my attention right now?" family of questions, which is answered
+     * straight from the database rather than by the LLM. Deliberately narrow: a question that
+     * does not clearly ask for the urgent/at-risk worklist falls through to the model, so a
+     * miss here costs latency, never a wrong answer.
+     */
+    private static final java.util.regex.Pattern ATTENTION_QUESTION = java.util.regex.Pattern.compile(
+        "(?i)(ticket|dossier)s?.{0,40}(urgent|attention|critique|prioritaire|en retard|sla)"
+        + "|(urgent|attention|critique|prioritaire|en retard|sla).{0,40}(ticket|dossier)s?");
 
     @PostConstruct
     public void init() {
@@ -136,28 +152,21 @@ public class AIAssistantController {
         }
         Ticket ticket = findTicket(ticketId);
 
-        List<Map<String, String>> kbArticles = new ArrayList<>();
-        try {
-            var articles = kbRepository.searchArticles(
-                ticket.getTitle(),
-                org.springframework.data.domain.PageRequest.of(0, 4)
-            ).getContent();
-            for (var a : articles) {
-                kbArticles.add(Map.of(
-                    "title", a.getTitle(),
-                    "summary", a.getSummary() != null ? a.getSummary() : "",
-                    "content", a.getContent() != null ? a.getContent().substring(0, Math.min(350, a.getContent().length())) : ""
-                ));
-            }
-        } catch (Exception e) {
-            log.debug("Pas d'articles KB pour copilot: {}", e.getMessage());
+        // Cache lookup happens only after the access check above, so a cache hit can never
+        // hand a briefing to someone who is not allowed to see the ticket. The key carries
+        // updatedAt, so editing the ticket naturally misses the cache and regenerates. The
+        // background precompute triggered from TicketService (see AICopilotService) usually
+        // already warmed this entry by the time an agent gets here.
+        Map<String, Object> cached = aiCopilotService.getCached(ticket);
+        if (cached != null) {
+            log.debug("Copilot cache hit for ticket {}", ticketId);
+            return ResponseEntity.ok(cached);
         }
 
-        Map<String, Object> body = Map.of(
-            "ticket", buildTicketPayload(ticket),
-            "kb_articles", kbArticles
-        );
-        return forwardPost("/copilot", body);
+        Map<String, Object> result = aiCopilotService.generateAndCache(ticket);
+        return result != null
+            ? ResponseEntity.ok(result)
+            : ResponseEntity.status(502).body(Map.of("error", "AI Agent indisponible", "path", "/copilot"));
     }
 
     // ─── Diagnose ────────────────────────────────────────────────────────────
@@ -321,10 +330,19 @@ public class AIAssistantController {
     @PostMapping("/chat")
     @Operation(summary = "Chat libre avec l'IA")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT')")
-    public ResponseEntity<Map> chat(@RequestBody Map<String, Object> requestBody) {
+    public ResponseEntity<Map> chat(@RequestBody Map<String, Object> requestBody,
+                                    @AuthenticationPrincipal Jwt jwt) {
         String message = requestBody.get("message").toString();
         Long ticketId = requestBody.containsKey("ticketId") && requestBody.get("ticketId") != null
             ? Long.valueOf(requestBody.get("ticketId").toString()) : null;
+
+        // "Which tickets need attention?" is a database question, not a language question.
+        // Answering it from SQL is instant and always accurate, where the LLM took ~30s on
+        // CPU-only inference and could invent ticket references. Anything not matching a
+        // known factual pattern still falls through to the model below.
+        if (ticketId == null && ATTENTION_QUESTION.matcher(message).find()) {
+            return ResponseEntity.ok(answerTicketsNeedingAttention(jwt, message));
+        }
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("message", message);
@@ -345,6 +363,137 @@ public class AIAssistantController {
         body.put("history", history);
 
         return forwardPost("/chat", body);
+    }
+
+    /**
+     * Builds the urgent-worklist answer from live ticket data. Agents only ever see their own
+     * assigned tickets here; managers and admins see the whole backlog, matching the scoping
+     * the rest of the application already applies.
+     */
+    private Map<String, Object> answerTicketsNeedingAttention(Jwt jwt, String question) {
+        Long scopeAgentId = authHelper.isManagerOrAdmin(jwt) ? null : authHelper.getUserId(jwt);
+        List<Ticket> tickets = ticketRepository.findTicketsNeedingAttention(
+            scopeAgentId, org.springframework.data.domain.PageRequest.of(0, 10));
+
+        String answer;
+        if (tickets.isEmpty()) {
+            answer = scopeAgentId == null
+                ? "Aucun ticket ne demande une attention immediate : aucun SLA depasse et aucun ticket critique ouvert."
+                : "Aucun de vos tickets ne demande une attention immediate.";
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append(tickets.size() == 1 ? "1 ticket demande votre attention :\n"
+                                          : tickets.size() + " tickets demandent votre attention :\n");
+            for (Ticket t : tickets) {
+                sb.append("\n- ").append(t.getReference()).append(" — ").append(t.getTitle())
+                  .append("\n  Priorite ").append(t.getPriority())
+                  .append(" · Statut ").append(t.getStatus())
+                  .append(Boolean.TRUE.equals(t.getSlaBreached()) ? " · SLA DEPASSE" : "")
+                  .append(t.getSlaDeadline() != null ? " · Echeance " + t.getSlaDeadline().format(FMT) : "")
+                  .append("\n");
+            }
+            answer = sb.toString();
+        }
+
+        // Same response shape the Python agent uses for its own static-knowledge shortcut
+        // (model "supportflow-facts"), so the frontend renders both identically.
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("question", question);
+        response.put("answer", answer);
+        response.put("ticket_context", null);
+        response.put("model", "supportflow-data");
+        response.put("duration_s", 0.0);
+        response.put("responded_at", java.time.LocalDateTime.now().toString());
+        return response;
+    }
+
+    /**
+     * Server-Sent Events variant of {@link #chat}. Generation dominates chat latency on
+     * CPU-only inference while prompt evaluation is under a second, so streaming puts the
+     * first words on screen in ~0.25s instead of leaving the user on a spinner for the whole
+     * answer. Authorization, per-user scoping and the instant database path are identical to
+     * the buffered endpoint - only the transport differs.
+     */
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Chat IA en streaming (SSE)")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPPORT_MANAGER', 'SUPPORT_AGENT')")
+    public ResponseEntity<StreamingResponseBody> chatStream(@RequestBody Map<String, Object> requestBody,
+                                                            @AuthenticationPrincipal Jwt jwt) {
+        String message = requestBody.get("message").toString();
+        Long ticketId = requestBody.containsKey("ticketId") && requestBody.get("ticketId") != null
+            ? Long.valueOf(requestBody.get("ticketId").toString()) : null;
+
+        // Factual questions are answered from SQL here too: already instant, so they are
+        // emitted as a single frame rather than routed through the model.
+        if (ticketId == null && ATTENTION_QUESTION.matcher(message).find()) {
+            Map<String, Object> answer = answerTicketsNeedingAttention(jwt, message);
+            StreamingResponseBody body = out -> {
+                writeSse(out, "token", Map.of("content", answer.get("answer")));
+                writeSse(out, "done", answer);
+                out.flush();
+            };
+            return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(body);
+        }
+
+        Map<String, Object> upstreamBody = new LinkedHashMap<>();
+        upstreamBody.put("message", message);
+        if (ticketId != null) {
+            try {
+                upstreamBody.put("ticket", buildTicketPayload(findTicket(ticketId)));
+            } catch (Exception e) {
+                log.debug("Ticket {} non trouve pour contexte chat stream", ticketId);
+            }
+        }
+        upstreamBody.put("history", requestBody.get("history") instanceof List
+            ? requestBody.get("history") : new ArrayList<>());
+
+        StreamingResponseBody body = out -> relayStream("/chat/stream", upstreamBody, out);
+        return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(body);
+    }
+
+    /** Copies the AI agent's SSE stream through to the caller as it arrives. */
+    private void relayStream(String path, Object requestBody, java.io.OutputStream out) {
+        try {
+            // Pinned to HTTP/1.1: the JDK client defaults to HTTP/2 and attempts an h2c
+            // upgrade, which uvicorn does not serve - the handshake ends up dropping the
+            // request body and the agent rejects the call as having no payload.
+            java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+                .version(java.net.http.HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(aiAgentUrl + path))
+                .timeout(Duration.ofSeconds(300))
+                .header("Content-Type", "application/json")
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                .build();
+
+            var response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofInputStream());
+            try (var in = response.body()) {
+                byte[] buffer = new byte[512];
+                int read;
+                // Flush on every chunk: buffering here would defeat the whole point by
+                // delivering the stream as one blob at the end.
+                while ((read = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, read);
+                    out.flush();
+                }
+            }
+        } catch (Exception e) {
+            log.error("AI Agent stream failed [{}]: {}", path, e.getMessage());
+            try {
+                writeSse(out, "error", Map.of("detail", "AI Agent indisponible"));
+                out.flush();
+            } catch (Exception ignored) {
+                log.debug("Client deconnecte avant l'envoi de l'erreur de streaming");
+            }
+        }
+    }
+
+    /** Writes one SSE frame; the trailing blank line is what terminates it for the browser. */
+    private void writeSse(java.io.OutputStream out, String event, Object data) throws java.io.IOException {
+        String frame = "event: " + event + "\ndata: " + objectMapper.writeValueAsString(data) + "\n\n";
+        out.write(frame.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     // ─── Generate KB Article ─────────────────────────────────────────────────

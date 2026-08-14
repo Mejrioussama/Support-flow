@@ -21,6 +21,15 @@
     <properties>
         <java.version>17</java.version>
         <!--
+          Without an explicit source encoding Maven falls back to the build machine's platform
+          charset (cp1252 on Windows), which silently mangles the accented French text in log
+          and exception messages a little more on every build. That is exactly how the literals
+          in TicketService ended up as unreadable mojibake. Pinning UTF-8 keeps sources readable
+          and makes builds reproducible across developer machines and CI containers.
+        -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <!--
           Security patch overrides for versions managed by spring-boot-starter-parent 3.2.0.
           Both stay inside the same minor line the parent already ships (Tomcat 10.1.x,
           Spring Security 6.2.x), so this is a patch-level bump, not a framework upgrade.
