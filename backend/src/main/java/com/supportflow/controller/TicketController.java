@@ -678,7 +678,11 @@ public class TicketController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal Jwt jwt) {
-        
+
+        if (!authHelper.canStaffAccessTicket(jwt, id)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         TicketStatus newStatus = TicketStatus.valueOf(body.get("status"));
         String reason = body.get("reason");
         Long userId = getUserIdFromJwt(jwt);
