@@ -150,6 +150,11 @@ import { SlaNotificationItemComponent } from '@shared/components/sla-notificatio
       right: 16px;
       /* Account for sidebar width + margins */
       left: calc(var(--sidebar-width) + 32px);
+      /* mat-toolbar ships its own width rule that otherwise wins over the fixed
+         left/right positioning above, stretching this bar to the full viewport
+         width and pushing the last 1-2 action buttons off-screen at narrower
+         desktop widths (~1280px). Forcing width:auto lets left/right compute it. */
+      width: auto !important;
       z-index: 100;
       height: var(--header-height);
       border-radius: 16px !important;
@@ -157,7 +162,7 @@ import { SlaNotificationItemComponent } from '@shared/components/sla-notificatio
       display: flex;
       align-items: center;
       padding: 0 16px;
-      
+
       &.collapsed {
         left: calc(var(--sidebar-collapsed) + 32px);
       }
