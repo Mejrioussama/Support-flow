@@ -216,6 +216,86 @@
         }
       ],
       "realmRoles": ["CLIENT"]
+    },
+    {
+      "username": "agent2",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Marie",
+      "lastName": "Trabelsi",
+      "email": "marie@supportflow.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "agent123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["SUPPORT_AGENT"]
+    },
+    {
+      "username": "agent3",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Sami",
+      "lastName": "Gharbi",
+      "email": "sami@supportflow.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "agent123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["SUPPORT_AGENT"]
+    },
+    {
+      "username": "client2",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Leila",
+      "lastName": "Mansour",
+      "email": "it@atlassante.tn",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["CLIENT"]
+    },
+    {
+      "username": "client3",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Mehdi",
+      "lastName": "Jlassi",
+      "email": "support@retailnova.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["CLIENT"]
+    },
+    {
+      "username": "client4",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Rania",
+      "lastName": "Kacem",
+      "email": "ops@financia-group.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["CLIENT"]
     }
   ],
   "clientScopes": [
