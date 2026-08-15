@@ -187,9 +187,9 @@ import {
                         {{ ticket.reference }}
                       </a>
                       <strong>{{ ticket.title }}</strong>
-                      <span>{{ ticket.client?.name || ticket.client?.companyName || 'Client non renseignÃ©' }}</span>
+                      <span>{{ ticket.client?.name || ticket.client?.companyName || 'Client non renseigné' }}</span>
                       @if (ticket.assignedTo || ticket.assignedAgent) {
-                        <span>AssignÃ© Ã  {{ ticket.assignedTo?.fullName || ticket.assignedAgent?.fullName }}</span>
+                        <span>Assigné à {{ ticket.assignedTo?.fullName || ticket.assignedAgent?.fullName }}</span>
                       }
                     </div>
                   </td>

@@ -3276,7 +3276,7 @@ export class TicketDetailComponent implements OnInit, OnDestroy {
   private validationWatchdogSoft: any = null;
   private validationWatchdogHard: any = null;
 
-  /** Smart agent recommendations for SLA breach âÂÂ loaded when SLA is critical */
+  /** Smart agent recommendations for SLA breach — loaded when SLA is critical */
   recommendedAgents: UserSummary[] = [];
   escalationEvents: any[] = [];
   copilotData: AICopilot | null = null;

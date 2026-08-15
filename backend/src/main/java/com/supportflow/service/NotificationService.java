@@ -79,7 +79,7 @@ public class NotificationService {
             Notification clientNotification = Notification.builder()
                 .user(ticket.getCreatedByUser())
                 .ticket(ticket)
-                .title("Ã°ÂÂÂ Votre ticket a été pris en charge")
+                .title("📌 Votre ticket a été pris en charge")
                 .message("Le ticket " + ticket.getReference() + " a été assigné à " + agent.getFullName())
                 .type("TICKET_ASSIGNED")
                 .icon("pi-user")
@@ -137,7 +137,7 @@ public class NotificationService {
     }
 
     /**
-     * Smart SLA Phase 1 âÂÂ Early Warning (50% du temps SLA consomme).
+     * Smart SLA Phase 1 — Early Warning (50% du temps SLA consomme).
      * Notifie l'agent avec guidance metier: continuer ou escalader.
      */
     public void notifySlaCheckpoint(Ticket ticket) {
@@ -145,7 +145,7 @@ public class NotificationService {
         saveAndSend(Notification.builder()
             .user(ticket.getAssignedAgent())
             .ticket(ticket)
-            .title("âÂÂ³ SLA 50% âÂÂ " + ticket.getReference())
+            .title("⏳ SLA 50% — " + ticket.getReference())
             .message("Le ticket consomme déjà 50% du temps SLA. " +
                      "Veuillez : continuer le traitement ou escalader manuellement au manager si nécessaire.")
             .type("SLA_WARNING_50")
@@ -160,7 +160,7 @@ public class NotificationService {
     }
 
     /**
-     * Smart SLA Phase 2 âÂÂ Risk Critical (80% du temps SLA consomme).
+     * Smart SLA Phase 2 — Risk Critical (80% du temps SLA consomme).
      * Notification forte pour l'agent + alerte superviseur.
      * Auto-upgrade priorite vers HIGH.
      */
@@ -169,7 +169,7 @@ public class NotificationService {
             saveAndSend(Notification.builder()
                 .user(ticket.getAssignedAgent())
                 .ticket(ticket)
-                .title("Ã°ÂÂÂ¨ SLA 80% âÂÂ Action urgente !")
+                .title("🚨 SLA 80% — Action urgente !")
                 .message("Ticket " + ticket.getReference() + " est proche du dépassement SLA. " +
                          "Recommandé : finaliser la résolution rapidement ou notifier le manager immédiatement.")
                 .type("SLA_WARNING_80")
@@ -186,7 +186,7 @@ public class NotificationService {
         managers.forEach(manager -> saveAndSend(Notification.builder()
             .user(manager)
             .ticket(ticket)
-            .title("Ã°ÂÂÂ¨ SLA 80% âÂÂ Supervision requise")
+            .title("🚨 SLA 80% — Supervision requise")
             .message("Le ticket " + ticket.getReference() + " est à risque critique (80% SLA consommé). " +
                      "Priorité automatiquement élevée à HIGH. Supervision recommandée.")
             .type("SLA_WARNING_80")
@@ -346,7 +346,7 @@ public class NotificationService {
         Notification agentNotif = Notification.builder()
             .user(newAgent)
             .ticket(ticket)
-            .title("Ã°ÂÂÂ© Ticket escaladé vers vous")
+            .title("📩 Ticket escaladé vers vous")
             .message("Le ticket " + ticket.getReference() + " a été escaladé vers vous. Motif: " + motif)
             .type("TICKET_ESCALATED")
             .icon("pi-arrow-up")
@@ -360,7 +360,7 @@ public class NotificationService {
             Notification clientNotif = Notification.builder()
                 .user(ticket.getCreatedByUser())
                 .ticket(ticket)
-                .title("Ã°ÂÂÂ© Votre ticket nécessite une expertise avancée")
+                .title("📩 Votre ticket nécessite une expertise avancée")
                 .message("Le ticket " + ticket.getReference() + " a été transmis à un spécialiste pour un traitement approfondi.")
                 .type("TICKET_ESCALATED")
                 .icon("pi-arrow-up")
@@ -372,7 +372,7 @@ public class NotificationService {
     }
     
     /**
-     * Smart SLA Phase 3 âÂÂ SLA Overrun (100%+).
+     * Smart SLA Phase 3 — SLA Overrun (100%+).
      * Smart Decision Notification pour managers/admins avec options d'action.
      * Inclut la recommandation intelligente du meilleur agent disponible.
      */
@@ -400,9 +400,9 @@ public class NotificationService {
         final Long finalRecommendedAgentId = recommendedAgentId;
 
         String managerActions = "[\"Résoudre le ticket vous-même\",\"Réassigner à un autre agent\",\"Maintenir l'assignation actuelle\",\"Ajouter un commentaire métier\"]";
-        String managerMsg = "âÂÂ SLA dépassé sur le ticket " + ticket.getReference() + ". Action requise immédiatement." +
+        String managerMsg = "⛔ SLA dépassé sur le ticket " + ticket.getReference() + ". Action requise immédiatement." +
             (finalRecommendedAgentName != null
-                ? " \n\nÃ°ÂÂ¤Â Meilleure action recommandée : Réassigner à " + finalRecommendedAgentName + "."
+                ? " \n\n🤖 Meilleure action recommandée : Réassigner à " + finalRecommendedAgentName + "."
                 : "");
 
         List<User> managers = userRepository.findByRoleAndIsActiveTrue(Role.SUPPORT_MANAGER);
@@ -411,7 +411,7 @@ public class NotificationService {
         managers.forEach(manager -> saveAndSend(Notification.builder()
             .user(manager)
             .ticket(ticket)
-            .title("âÂÂ SLA dépassé âÂÂ Action requise")
+            .title("⛔ SLA dépassé — Action requise")
             .message(managerMsg)
             .type("SLA_ESCALATION")
             .icon("pi-exclamation-triangle")
@@ -427,7 +427,7 @@ public class NotificationService {
         admins.forEach(admin -> saveAndSend(Notification.builder()
             .user(admin)
             .ticket(ticket)
-            .title("âÂÂ SLA dépassé âÂÂ Intervention requise")
+            .title("⛔ SLA dépassé — Intervention requise")
             .message(managerMsg)
             .type("SLA_ESCALATION")
             .icon("pi-exclamation-triangle")
@@ -444,7 +444,7 @@ public class NotificationService {
             saveAndSend(Notification.builder()
                 .user(ticket.getAssignedAgent())
                 .ticket(ticket)
-                .title("âÂÂ SLA dépassé âÂÂ Traitement prioritaire")
+                .title("⛔ SLA dépassé — Traitement prioritaire")
                 .message("Le ticket " + ticket.getReference() + " est en escalade SLA critique. " +
                          "Traitez en priorité absolue ou contactez votre manager immédiatement.")
                 .type("SLA_ESCALATION")
@@ -461,7 +461,7 @@ public class NotificationService {
             saveAndSend(Notification.builder()
                 .user(ticket.getCreatedByUser())
                 .ticket(ticket)
-                .title("Ã°ÂÂÂ Mise à jour SLA âÂÂ " + ticket.getReference())
+                .title("🔄 Mise à jour SLA — " + ticket.getReference())
                 .message("Votre ticket est passé en traitement prioritaire (escalade SLA) pour accélérer la résolution. " +
                          "Notre équipe travaille activement sur votre demande.")
                 .type("SLA_ESCALATION")

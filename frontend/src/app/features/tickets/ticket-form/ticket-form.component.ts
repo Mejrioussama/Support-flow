@@ -100,7 +100,7 @@ import { Ticket, Client, User, TicketPriority, TicketCategory, UserSummary, Know
                           <span class="type-label">{{ t.label }}</span>
                           <div class="active-indicator"></div>
                         </div>
-                        <span>{{ selectedFiles.length }} fichier(s) prÃªt(s) Ã  l'envoi</span>
+                        <span>{{ selectedFiles.length }} fichier(s) prêt(s) à l'envoi</span>
                       }
                     </div>
                   </div>
@@ -151,12 +151,12 @@ import { Ticket, Client, User, TicketPriority, TicketCategory, UserSummary, Know
                           }
                           <div class="prime-priority-progress">
                             <div class="progress-labels">
-                              <span>IntensitÃ© SLA</span>
+                              <span>Intensité SLA</span>
                               <strong>{{ getPriorityProgressValue() }}%</strong>
                             </div>
                             <p-progressBar [value]="getPriorityProgressValue()" [showValue]="false"></p-progressBar>
                           </div>
-                        <span>{{ selectedFiles.length }} fichier(s) prÃªt(s) Ã  l'envoi</span>
+                        <span>{{ selectedFiles.length }} fichier(s) prêt(s) à l'envoi</span>
                       </div>
                       </div>
                     
@@ -193,15 +193,15 @@ import { Ticket, Client, User, TicketPriority, TicketCategory, UserSummary, Know
                     <div class="form-section">
                       <div class="section-header">
                         <mat-icon class="section-icon">auto_stories</mat-icon>
-                        <h3>Solutions recommandÃ©es avant envoi</h3>
+                        <h3>Solutions recommandées avant envoi</h3>
                       </div>
 
                       <div class="knowledge-assist-panel glass-panel highlight-border">
                         <div class="knowledge-assist-top">
                           <div>
                             <span class="knowledge-eyebrow">Portail client autonome</span>
-                            <h4>VÃ©rifions d'abord si une solution connue peut vous aider</h4>
-                            <p>SupportFlow analyse votre brouillon et propose des articles dÃ©jÃ  validÃ©s par le support avant d'ouvrir un nouveau ticket.</p>
+                            <h4>Vérifions d'abord si une solution connue peut vous aider</h4>
+                            <p>SupportFlow analyse votre brouillon et propose des articles déjà validés par le support avant d'ouvrir un nouveau ticket.</p>
                           </div>
                           <button
                             type="button"
@@ -229,15 +229,15 @@ import { Ticket, Client, User, TicketPriority, TicketCategory, UserSummary, Know
                             <mat-icon>check_circle</mat-icon>
                             <div>
                               <strong>Parfait, une solution semble vous aider.</strong>
-                              <p>Vous pouvez fermer cette page si le besoin est couvert, ou crÃ©er quand mÃªme un ticket si le problÃ¨me persiste.</p>
+                              <p>Vous pouvez fermer cette page si le besoin est couvert, ou créer quand même un ticket si le problème persiste.</p>
                             </div>
                             <button type="button" mat-button class="knowledge-anyway-btn" (click)="submitAfterKnowledgeReview()">
-                              CrÃ©er quand mÃªme le ticket
+                              Créer quand même le ticket
                             </button>
                           </div>
                         } @else if (knowledgeSuggestions.length > 0 && !knowledgeSuggestionsDismissed) {
                           <div class="knowledge-results-header">
-                            <strong>{{ knowledgeSuggestions.length }} article(s) recommandÃ©(s)</strong>
+                            <strong>{{ knowledgeSuggestions.length }} article(s) recommandé(s)</strong>
                             <span>Consultez d'abord ces pistes avant d'envoyer au support.</span>
                           </div>
 
@@ -266,7 +266,7 @@ import { Ticket, Client, User, TicketPriority, TicketCategory, UserSummary, Know
                                 }
 
                                 <details class="knowledge-card__details">
-                                  <summary>Voir la solution dÃ©taillÃ©e</summary>
+                                  <summary>Voir la solution détaillée</summary>
                                   <pre>{{ article.content }}</pre>
                                 </details>
 
@@ -282,7 +282,7 @@ import { Ticket, Client, User, TicketPriority, TicketCategory, UserSummary, Know
                                     {{ hasMarkedKnowledgeArticleHelpful(article.id) ? 'Solution retenue' : 'Cela m aide' }}
                                   </button>
                                   <button type="button" mat-button class="knowledge-anyway-btn" (click)="submitAfterKnowledgeReview()">
-                                    CrÃ©er quand mÃªme le ticket
+                                    Créer quand même le ticket
                                   </button>
                                 </div>
                               </article>
@@ -292,17 +292,17 @@ import { Ticket, Client, User, TicketPriority, TicketCategory, UserSummary, Know
                           <div class="knowledge-state knowledge-state--neutral">
                             <mat-icon>tips_and_updates</mat-icon>
                             <div>
-                              <strong>Aucune solution suffisamment proche n'a Ã©tÃ© trouvÃ©e.</strong>
-                              <p>Vous pouvez envoyer le ticket: l'Ã©quipe support prendra le relais avec votre contexte complet.</p>
+                              <strong>Aucune solution suffisamment proche n'a été trouvée.</strong>
+                              <p>Vous pouvez envoyer le ticket: l'équipe support prendra le relais avec votre contexte complet.</p>
                             </div>
                             <button type="button" mat-button class="knowledge-anyway-btn" (click)="submitAfterKnowledgeReview()">
-                              CrÃ©er quand mÃªme le ticket
+                              Créer quand même le ticket
                             </button>
                           </div>
                         } @else {
                           <div class="knowledge-state knowledge-state--neutral">
                             <mat-icon>edit_note</mat-icon>
-                            <span>Ajoutez un titre clair ou une description plus prÃ©cise pour obtenir des suggestions automatiques.</span>
+                            <span>Ajoutez un titre clair ou une description plus précise pour obtenir des suggestions automatiques.</span>
                           </div>
                         }
                       </div>
@@ -325,7 +325,7 @@ import { Ticket, Client, User, TicketPriority, TicketCategory, UserSummary, Know
                         [showCancelButton]="false"
                         chooseLabel="Ajouter des fichiers"
                         invalidFileSizeMessageSummary="Fichier trop volumineux"
-                        invalidFileSizeMessageDetail="La taille maximale autorisÃ©e est de 10 Mo."
+                        invalidFileSizeMessageDetail="La taille maximale autorisée est de 10 Mo."
                         (onSelect)="onPrimeFilesSelected($event)">
                       </p-fileUpload>
                       <div class="mobile-upload-hint">
@@ -1538,16 +1538,16 @@ export class TicketFormComponent implements OnInit, OnDestroy {
           );
           this.showToast(
             'success',
-            this.isEditMode ? 'Ticket mis Ã  jour' : 'Ticket crÃ©Ã©',
+            this.isEditMode ? 'Ticket mis à jour' : 'Ticket créé',
             this.selectedFiles.length > 0
-              ? 'Le ticket et ses piÃ¨ces jointes sont prÃªts pour le workflow.'
-              : 'Le ticket a Ã©tÃ© transmis au support.'
+              ? 'Le ticket et ses pièces jointes sont prêts pour le workflow.'
+              : 'Le ticket a été transmis au support.'
           );
           this.router.navigate(['/tickets', ticket.id]);
         } catch (uploadError) {
           this.saving = false;
           console.error('Error uploading attachments:', uploadError);
-          this.showToast('warn', 'Ticket enregistrÃ©', 'Les piÃ¨ces jointes n\'ont pas toutes pu Ãªtre transfÃ©rÃ©es.');
+          this.showToast('warn', 'Ticket enregistré', 'Les pièces jointes n\'ont pas toutes pu être transférées.');
           this.snackBar.open('Ticket créé, mais erreur upload pièces jointes', 'Fermer', { duration: 4000 });
           this.router.navigate(['/tickets', ticket.id]);
         }
@@ -1615,7 +1615,7 @@ export class TicketFormComponent implements OnInit, OnDestroy {
           this.selectedFiles.push(currentFile);
         }
       } else {
-        this.showToast('warn', 'Fichier refusÃ©', `${currentFile.name} dÃ©passe 10 Mo.`);
+        this.showToast('warn', 'Fichier refusé', `${currentFile.name} dépasse 10 Mo.`);
         this.snackBar.open(`Fichier ${currentFile.name} trop volumineux (> 10 Mo)`, 'Fermer', { duration: 3000 });
       }
     }
@@ -1792,11 +1792,11 @@ export class TicketFormComponent implements OnInit, OnDestroy {
       next: () => {
         this.knowledgeHelpfulArticleIds.add(article.id!);
         this.knowledgeSolvedArticleId = article.id!;
-        this.showToast('success', 'Solution retenue', 'Parfait. Vous pouvez fermer cette page si le besoin est couvert, ou crÃ©er tout de mÃªme un ticket si le problÃ¨me persiste.');
+        this.showToast('success', 'Solution retenue', 'Parfait. Vous pouvez fermer cette page si le besoin est couvert, ou créer tout de même un ticket si le problème persiste.');
       },
       error: (error) => {
         console.error('Error marking knowledge article helpful:', error);
-        this.showToast('warn', 'Retour non enregistrÃ©', "L'article reste consultable, mais le feedback utile n'a pas pu Ãªtre transmis.");
+        this.showToast('warn', 'Retour non enregistré', "L'article reste consultable, mais le feedback utile n'a pas pu être transmis.");
       }
     });
   }

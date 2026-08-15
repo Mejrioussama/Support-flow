@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Entité Ticket - CÃÂur du système SupportFlow
+ * Entité Ticket - Cœur du système SupportFlow
  */
 @Entity
 @Table(name = "tickets", indexes = {
@@ -277,7 +277,7 @@ public class Ticket extends BaseEntity {
     
     /**
      * Calcule le score du ticket basé sur gravité, impact et SLA
-     * Formula: Score = (Gravité à 3) + (Impact à 2) + (SLA Factor)
+     * Formula: Score = (Gravité × 3) + (Impact × 2) + (SLA Factor)
      */
     public int calculateScore() {
         int gravityScore = severity != null ? severity.getWeight() * 3 : 0;
