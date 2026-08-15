@@ -16,6 +16,12 @@ TRUNCATE TABLE tickets;
 TRUNCATE TABLE users;
 TRUNCATE TABLE support_categories;
 TRUNCATE TABLE clients;
+-- Was missing here: a demo reset left the sequence at whatever value ad-hoc API-created
+-- tickets had pushed it to (e.g. 1016) while the reseeded tickets below only go up to
+-- SF-1012, so the next ticket created after a reset would jump to SF-1017 with a visible
+-- gap. Truncate it too; the correct value is (re)inserted at the end of this file once the
+-- ticket rows exist, the same way it's derived in V3__ticket_reference_sequence.sql.
+TRUNCATE TABLE ticket_reference_sequence;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Clients
@@ -383,3 +389,8 @@ VALUES
    false, 0, true, true, DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 17 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 16 HOUR), 0),
   (2, 8, 9, 4, 'Bonne resolution. Nous aurions aime un point de situation plus tot pendant l incident.', 240,
    false, 0, true, true, DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 55 HOUR), DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 52 HOUR), 0);
+
+-- Compteur de reference tickets (doit demarrer apres le dernier SF-#### seede ci-dessus)
+INSERT INTO ticket_reference_sequence (id, seq_value)
+SELECT 1, COALESCE(MAX(CAST(SUBSTRING(reference, 4) AS UNSIGNED)), 0)
+FROM tickets;
