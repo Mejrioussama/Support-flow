@@ -35,10 +35,12 @@
           Spring Security 6.2.x), so this is a patch-level bump, not a framework upgrade.
           Tomcat 10.1.16 -> 10.1.55 clears CVE-2025-24813, CVE-2026-41293, CVE-2026-43512 and
           CVE-2026-43515 (all CRITICAL) plus a long tail of HIGH findings.
+          10.1.55 -> 10.1.61 clears CVE-2026-65182, CVE-2026-65637, CVE-2026-65905 and
+          CVE-2026-68525 (all CRITICAL, published after the previous bump).
           Spring Security 6.2.0 -> 6.2.8 clears CVE-2024-38821 (CRITICAL), CVE-2024-22234 and
           CVE-2024-22257. 6.2.8 is the last OSS release on the 6.2 line.
         -->
-        <tomcat.version>10.1.55</tomcat.version>
+        <tomcat.version>10.1.61</tomcat.version>
         <spring-security.version>6.2.8</spring-security.version>
         <camunda.version>7.20.0</camunda.version>
         <keycloak.version>23.0.1</keycloak.version>

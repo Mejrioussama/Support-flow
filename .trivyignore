@@ -21,3 +21,12 @@
 # 6.5.9 means Spring Boot 3.2 -> 3.5, which in turn requires a Camunda 7.20 -> 7.23+ upgrade.
 # That upgrade chain is tracked as post-freeze work, not a patch.
 CVE-2026-22732
+
+# CVE-2026-47884 - spring-webmvc: remote code execution through improper path limitation in
+# XsltView. Only applications that render views with XsltView (XSLT templates) are exposed.
+#
+# Not reachable here: SupportFlow is a pure REST/JSON API and never uses XsltView or any XSLT
+# view resolver (no XsltView / XsltViewResolver anywhere in backend/src). Not fixable on this
+# line either: the only fixed release is 7.0.9 (Spring Framework 7 = Spring Boot 4), the same
+# post-freeze upgrade chain as CVE-2026-22732 above. Re-check if XSLT views are ever added.
+CVE-2026-47884
