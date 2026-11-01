@@ -15,6 +15,11 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        # Numeric IDs are required: the image declares USER supportflow (a name), and the
+        # kubelet cannot prove a named user is non-root -> CreateContainerConfigError.
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
         seccompProfile:
           type: RuntimeDefault
       containers:

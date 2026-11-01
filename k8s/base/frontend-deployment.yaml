@@ -15,6 +15,10 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        # Numeric IDs are required: nginx:alpine declares USER nginx (a name), which the
+        # kubelet cannot verify as non-root -> CreateContainerConfigError. nginx = 101.
+        runAsUser: 101
+        runAsGroup: 101
         seccompProfile:
           type: RuntimeDefault
       containers:
